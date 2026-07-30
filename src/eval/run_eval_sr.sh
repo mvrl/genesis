@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 # =============================================================================
-# run_eval_sr.sh — evaluate a Genesis SR ckpt on a Git-10M split.
+# run_eval_sr.sh — Super-resolution eval for the Genesis MAIN models (paper Table 2).
 #
-# Pull defaults are tuned for the Phase-1 ablation D ckpt on val_random.
-# Override via env vars or pass extra `--…` flags after the script name.
+# Defaults reproduce a Table-2 cell: main_b16, random_test, ×2, cfg 1.0, 50 steps,
+# DINO on, NO bicubic-init, full split. Override via env vars or extra `--…` flags.
+# For the SR ablation (paper Table 5) use run_eval_sr_ablation.sh instead.
 #
 # Usage:
-#   ./run_eval_sr.sh                                # defaults: abl_dino_lpips, val_random, ×2
-#   EXP=abl_dino_lpips STAGE=3 SPLIT=val_random ./run_eval_sr.sh
-#   EXP=main_h16 STAGE=3 SPLIT=random_test SCALE=2 ./run_eval_sr.sh    # iterative ×4
-#   ./run_eval_sr.sh --max_samples 32                # smoke test
-#   CKPT=/abs/path/to/x.ckpt ./run_eval_sr.sh        # bypass --exp / --stage
+#   ./run_eval_sr.sh                                              # Table 2: main_b16, random_test
+#   EXP=main_h16 MODEL=JiT-H/16 SPLIT=spatial_test ./run_eval_sr.sh
+#   EXP=main_b16 ./run_eval_sr.sh --child_zl_group z18            # one child-zoom group
+#   ./run_eval_sr.sh --max_samples 32                            # smoke test
+#   CKPT=/abs/path/to/x.ckpt ./run_eval_sr.sh                    # bypass --exp / --stage
 # =============================================================================
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -21,12 +22,12 @@ HINDEX_PKL="${GENESIS_HINDEX:-}"       # empty → auto-pull from Google Drive
 HF_CACHE="${HF_DATASETS_CACHE:-}"      # empty → HF default cache
 
 # ── Configurable ─────────────────────────────────────────────────────────────
-EXP="${EXP:-abl_dino_lpips}"      # ablation cell or main_b16/main_h16
+EXP="${EXP:-main_b16}"            # main_b16 / main_h16 (paper Table 2) or abl_* (Table 5)
 STAGE="${STAGE:-3}"
 MODEL="${MODEL:-JiT-B/16}"
 CKPT="${CKPT:-}"                  # if set, --ckpt wins over --exp + --stage
 
-SPLIT="${SPLIT:-val_random}"
+SPLIT="${SPLIT:-random_test}"     # paper Table 2 test splits: random_test / spatial_test
 SCALE="${SCALE:-1}"               # 1=×2, 2=×4, 3=×8, 4=×16
 
 CFG="${CFG:-1.0}"

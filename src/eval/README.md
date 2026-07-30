@@ -11,7 +11,9 @@ Reproduces the **Genesis (JiT-B/16 and JiT-H/16) numbers** in the paper:
 | Table 6 | Mean FID across all SR / OP cells | [Mean FID](#table-6--mean-fid) |
 
 > Comparison **baselines are not included** — this repo evaluates our checkpoints only.
-> Metric definitions and per-metric implementation notes are in [`METRICS.md`](METRICS.md).
+> Metric definitions and per-metric implementation notes are in [`docs/METRICS.md`](../../docs/METRICS.md).
+> Every training/eval hyperparameter (paper vs. code, per experiment) is tabulated in
+> [`docs/HYPERPARAMETERS.md`](../../docs/HYPERPARAMETERS.md).
 
 ## Setup
 
@@ -97,7 +99,7 @@ python aggregate.py --task op --metric lpips --pivot exp --columns split,regime
 for P in A B C; do for W in 1 2 3 4 5; do
   PYTHONPATH=../.. python -m pyramid.run_pyramid_eval \
     --protocol $P --window $W --sites 0:100 \
-    --arch JiT-H/16 --steps 100 --cfg 2.5 --uni_overlap 32 --uni_t 0.40 \
+    --arch JiT-H/16 --steps 50 --cfg 2.5 --uni_overlap 32 --uni_t 0.40 \
     --out_root outputs/dense500_eval_h16
 done; done
 # repeat with --arch JiT-B/16 --out_root outputs/dense500_eval_b16
@@ -127,13 +129,12 @@ files.
 ## Table 5 — SR ablation
 
 The four ablation checkpoints (DINOv3 × LPIPS) evaluated on `val_spatial` under the bicubic-init
-SR setting:
+SR setting (500k ablation ckpts). `run_eval_sr_ablation.sh` sets the whole Table-5 config from
+`CELL` (bicubic-init on, `val_spatial`, 5000 samples, JiT-B/16, DINO off for the `nodino_*` cells):
 
 ```bash
 for C in nodino_nolpips dino_nolpips nodino_lpips dino_lpips; do
-  ND=0; case $C in nodino*) ND=1;; esac
-  EXP=abl_$C MODEL=JiT-B/16 SPLIT=val_spatial NO_DINO=$ND \
-    BICUBIC_INIT=1 MAX_SAMPLES=5000 OUT_DIR=results/abl_$C ./run_eval_sr.sh
+  CELL=$C OUT_DIR=results/abl_$C ./run_eval_sr_ablation.sh
   python compute_fid_kid.py --root results --pattern abl_$C
 done
 python aggregate.py --task sr --metric lpips --pivot exp --columns split
@@ -154,5 +155,5 @@ per-sample tables, or directly from the `fid_kid.json` outputs).
 
 `common.py` (checkpoint/DINO resolution, model loading, `compute_metrics`, `SampleWriter`) ·
 `eval_sr.py` · `eval_op.py` · `eval_pyramid.py` · `eval_ext.py` + `metrics_ext.py` ·
-`caption_agree.py` · `compute_fid_kid.py` · `aggregate.py` · wrappers `run_eval_sr.sh` /
-`run_eval_op.sh`.
+`caption_agree.py` · `compute_fid_kid.py` · `aggregate.py` · wrappers `run_eval_sr.sh` (Table 2) /
+`run_eval_sr_ablation.sh` (Table 5) / `run_eval_op.sh` (Table 3).

@@ -1,6 +1,6 @@
 # Genesis Eval Metrics
 
-The per-sample metrics computed by [`common.py:compute_metrics`](common.py)
+The per-sample metrics computed by [`common.py:compute_metrics`](../src/eval/common.py)
 and written to `samples.csv`. Every metric is backed by a library
 implementation; the math, code, and OP hole-awareness behaviour are
 documented per-metric below.
@@ -23,7 +23,7 @@ pixels with GT inside `denoiser.generate()` before metrics see the
 output, so a naive full-image SSIM would be dominated by those copied
 pixels).
 
-`_hole_scoring_regions(mb, h, w)` ([`common.py:333`](common.py#L333))
+`_hole_scoring_regions(mb, h, w)` ([`common.py:333`](../src/eval/common.py#L333))
 takes the boolean hole mask and returns a list of rectangular regions
 to score independently:
 
@@ -53,7 +53,7 @@ gather instead (no need for regions because it doesn't use spatial
 windows / feature maps). `boundary_diff` constructs its own ring
 directly from the mask.
 
-See [`README.md`](README.md) for the per-regime mask layouts the eval
+See [`README.md`](../src/eval/README.md) for the per-regime mask layouts the eval
 script samples.
 
 ---
@@ -71,7 +71,7 @@ $$
 with $\text{MAX} = 1$ for inputs in $[0, 1]$. Direction: **↑ better**,
 unbounded above, typically 10–35 dB on natural images.
 
-### Code ([`common.py:446`](common.py#L446))
+### Code ([`common.py:446`](../src/eval/common.py#L446))
 
 ```python
 from torchmetrics.functional import peak_signal_noise_ratio
@@ -119,7 +119,7 @@ image.
 
 Direction: **↑ better**, range roughly $[0, 1]$.
 
-### Code ([`common.py:464`](common.py#L464))
+### Code ([`common.py:464`](../src/eval/common.py#L464))
 
 ```python
 from torchmetrics.image import StructuralSimilarityIndexMeasure
@@ -170,7 +170,7 @@ $$
 where $\hat\phi_l$ is the unit-normalized feature map at layer $l$.
 Direction: **↓ better**, range ~0.05–0.5 on natural images.
 
-### Code ([`common.py:479`](common.py#L479))
+### Code ([`common.py:479`](../src/eval/common.py#L479))
 
 ```python
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
@@ -224,7 +224,7 @@ $$
 
 Direction: **↓ better**, range ~0..1.
 
-### Code ([`common.py:491`](common.py#L491))
+### Code ([`common.py:491`](../src/eval/common.py#L491))
 
 ```python
 from DISTS_pytorch import DISTS
@@ -274,7 +274,7 @@ $$
 Lower = the model's fill stitches smoothly onto the known region.
 Direction: **↓ better**, range 0–255.
 
-### Code ([`common.py:529`](common.py#L529))
+### Code ([`common.py:529`](../src/eval/common.py#L529))
 
 ```python
 from scipy.ndimage import binary_erosion
@@ -306,7 +306,7 @@ quadrant).
 The three library networks live as module-level globals in `common.py`
 so they're loaded once per process and reused across thousands of
 samples. Initialized lazily on first use
-([`common.py:284-320`](common.py#L284)):
+([`common.py:284-320`](../src/eval/common.py#L284)):
 
 ```python
 _DISTS_FN = None    # DISTS_pytorch.DISTS()

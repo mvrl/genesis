@@ -1,8 +1,6 @@
 # Genesis
 
-A diffusion transformer for multi-scale, multi-conditioned, hierarchy-aware
-satellite image generation, trained on
-[`lcybuaa/Git-10M`](https://huggingface.co/datasets/lcybuaa/Git-10M).
+A Generative Engine for Hierarchical Satellite Image Synthesis.
 
 ```
 src/
@@ -18,11 +16,16 @@ src/
 |------|-----------|----------|--------|
 | Super-resolution | [`src/superresolution/`](src/superresolution/) | `run_sr.sh` | [`src/superresolution/README.md`](src/superresolution/README.md) |
 | Outpainting | [`src/outpainting/`](src/outpainting/) | `run_op.sh` | [`src/outpainting/README.md`](src/outpainting/README.md) |
-| Evaluation | [`src/eval/`](src/eval/) | `run_eval_sr.sh` / `run_eval_op.sh` | [`src/eval/README.md`](src/eval/README.md) + [`src/eval/METRICS.md`](src/eval/METRICS.md) |
+| Evaluation | [`src/eval/`](src/eval/) | `run_eval_sr.sh` / `run_eval_op.sh` | [`src/eval/README.md`](src/eval/README.md) + [`docs/METRICS.md`](docs/METRICS.md) |
 
 Interactive demos under [`demos/`](demos/) auto-fetch checkpoints from
 Google Drive and run inference end-to-end — see
 [`demos/README.md`](demos/README.md).
+
+📖 **Reproducibility docs** live in [`docs/`](docs/): every training and evaluation
+hyperparameter (paper vs. code, per experiment) is tabulated in
+[`docs/HYPERPARAMETERS.md`](docs/HYPERPARAMETERS.md); metric definitions and backends in
+[`docs/METRICS.md`](docs/METRICS.md).
 
 ---
 
@@ -129,7 +132,7 @@ numbers in **every paper table** — SR (Table 2), outpainting (Table 3), dense5
 completion (Table 4), the SR ablation (Table 5), and mean FID (Table 6). Metrics are
 PSNR / SSIM / LPIPS / DISTS / B-diff (OP) / FID for the tile tasks, plus CLIP-I / DINOv3-sat /
 Caption and LR-PSNR / xLR-PSNR / RAPSD for the pyramid — all library-backed; see
-[`src/eval/METRICS.md`](src/eval/METRICS.md). Checkpoints and the dense500 benchmark
+[`docs/METRICS.md`](docs/METRICS.md). Checkpoints and the dense500 benchmark
 auto-download on first use.
 
 ```bash

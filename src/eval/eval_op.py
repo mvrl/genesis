@@ -1,6 +1,6 @@
 """Outpainting evaluation: per-sample metrics → <out_dir>/samples.csv + run.json.
 Quadrant-only regimes: ``quad1 / quad2_adj / quad2_diag / quad3``
-(see ``make_mask_for_regime`` and ``METRICS.md``). Masks are sampled
+(see ``make_mask_for_regime`` and ``docs/METRICS.md``). Masks are sampled
 deterministically per ``(seed, idx)``. Reference-based metrics
 (psnr/ssim/lpips/dists/boundary_diff) are restricted to the
 hole region — the model overwrites the known region with GT, so

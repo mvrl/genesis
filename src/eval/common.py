@@ -15,7 +15,7 @@ the mask aligns to the 4 quadrants, else a single hole bounding box —
 and average across regions. PSNR uses per-pixel mask gather.
 ``boundary_diff`` uses a 4-pixel ring inside the hole edge.
 
-See ``src/eval/METRICS.md`` for the full per-metric breakdown.
+See ``docs/METRICS.md`` for the full per-metric breakdown.
 """
 from __future__ import annotations
 
@@ -340,7 +340,7 @@ def load_op_denoiser(ckpt_path: str, model_name: str, dino_weights: str, device:
 # windowed pair-comparison metrics; pixel-gather for PSNR; ring
 # extraction for boundary_diff).
 #
-# See `src/eval/METRICS.md` for the full per-metric breakdown.
+# See `docs/METRICS.md` for the full per-metric breakdown.
 
 _DISTS_FN: Optional[torch.nn.Module] = None
 _SSIM_FN:  Optional[torch.nn.Module] = None
