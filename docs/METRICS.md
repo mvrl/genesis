@@ -5,6 +5,10 @@ and written to `samples.csv`. Every metric is backed by a library
 implementation; the math, code, and OP hole-awareness behaviour are
 documented per-metric below.
 
+> These are the per-tile **SR / outpainting** metrics (super-resolution, outpainting, and
+> the SR ablation results). The **dense500 pyramid** metrics (CLIP-I, DINOv3-sat, Caption,
+> LR-PSNRbox, xLR-PSNR, RAPSD) are in [`METRICS_DENSE500.md`](METRICS_DENSE500.md).
+
 ## At a glance
 
 | Column          | Library            | Direction | Range          | SR | OP | OP hole-aware |
@@ -114,7 +118,7 @@ $$
 $$
 
 with $C_1 = (0.01 \cdot L)^2$, $C_2 = (0.03 \cdot L)^2$ and
-$L = \text{data\_range} = 1.0$. Per-window SSIM is averaged across the
+$L = \text{data range} = 1.0$. Per-window SSIM is averaged across the
 image.
 
 Direction: **↑ better**, range roughly $[0, 1]$.
@@ -266,7 +270,7 @@ The metric is the mean absolute difference between the model's output
 and `base` on those ring pixels, scaled to the 8-bit pixel range:
 
 $$
-\text{boundary\_diff} =
+\text{boundary-diff} =
 255 \cdot \frac{1}{\lvert\text{ring}\rvert}
 \sum_{i \in \text{ring}} \lvert\hat{x}_i - b_i\rvert
 $$

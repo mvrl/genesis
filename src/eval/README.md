@@ -2,13 +2,13 @@
 
 Reproduces the **Genesis (JiT-B/16 and JiT-H/16) numbers** in the paper:
 
-| Paper table | What it reports | Section |
+| Experiment | What it reports | Section |
 |---|---|---|
-| Table 2 | Super-resolution — PSNR/SSIM/LPIPS/DISTS/FID per child-zoom group, 2 splits | [SR](#table-2--super-resolution) |
-| Table 3 | Outpainting — LPIPS/DISTS/B-diff/FID per mask regime, 2 splits | [OP](#table-3--outpainting) |
-| Table 4 | dense500 pyramid — image quality + semantic + consistency | [Pyramid](#table-4--dense500-pyramid-completion) |
-| Table 5 | SR ablation — DINOv3 × LPIPS on `val_spatial` | [Ablation](#table-5--sr-ablation) |
-| Table 6 | Mean FID across all SR / OP cells | [Mean FID](#table-6--mean-fid) |
+| Super-resolution | PSNR/SSIM/LPIPS/DISTS/FID per child-zoom group, 2 splits | [SR](#super-resolution) |
+| Outpainting | LPIPS/DISTS/B-diff/FID per mask regime, 2 splits | [OP](#outpainting) |
+| dense500 pyramid | image quality + semantic + consistency | [Pyramid](#dense500-pyramid-completion) |
+| SR ablation | DINOv3 × LPIPS on `val_spatial` | [Ablation](#sr-ablation) |
+| Mean FID | mean across all SR / OP cells | [Mean FID](#mean-fid) |
 
 > Comparison **baselines are not included** — this repo evaluates our checkpoints only.
 > Metric definitions and per-metric implementation notes are in [`docs/METRICS.md`](../../docs/METRICS.md).
@@ -41,7 +41,7 @@ cd src/eval
 
 ---
 
-## Table 2 — Super-resolution
+## Super-resolution
 
 `eval_sr.py` (via `run_eval_sr.sh`) scores a checkpoint on a Git-10M split, writing per-sample
 `samples.csv` **and** `predictions/`+`targets/` PNGs; FID is then computed over those PNGs,
@@ -64,11 +64,11 @@ python aggregate.py --task sr --metric lpips --pivot exp --columns split,zl_buck
 # swap --metric psnr|ssim|dists to fill the other columns
 ```
 
-`--scale {1,2,3,4}` selects ×2/×4/×8/×16 (Table 2 is single-step ×2 = `--scale 1`, the default).
+`--scale {1,2,3,4}` selects ×2/×4/×8/×16 (SR uses single-step ×2 = `--scale 1`, the default).
 
 ---
 
-## Table 3 — Outpainting
+## Outpainting
 
 `eval_op.py` (via `run_eval_op.sh`) scores one mask regime at a time (hole-aware metrics + B-diff).
 Loop the four regimes for each model × split:
@@ -89,7 +89,10 @@ python aggregate.py --task op --metric lpips --pivot exp --columns split,regime
 
 ---
 
-## Table 4 — dense500 pyramid completion
+## dense500 pyramid completion
+
+> Metric definitions (image quality + semantic + consistency) are in
+> [`docs/METRICS_DENSE500.md`](../../docs/METRICS_DENSE500.md).
 
 **1. Generate** the full-pyramid completions for each seed protocol (A/B/C) × zoom window (1–5),
 100 sites each, for both backbones. Settings match the paper's engine configuration
@@ -126,7 +129,7 @@ files.
 
 ---
 
-## Table 5 — SR ablation
+## SR ablation
 
 The four ablation checkpoints (DINOv3 × LPIPS) evaluated on `val_spatial` under the bicubic-init
 SR setting (500k ablation ckpts). `run_eval_sr_ablation.sh` sets the whole Table-5 config from
@@ -142,7 +145,7 @@ python aggregate.py --task sr --metric lpips --pivot exp --columns split
 
 ---
 
-## Table 6 — Mean FID
+## Mean FID
 
 Mean of the per-cell FID values: the 6 SR cells (2 splits × 3 child-zoom groups) and the 8 OP
 cells (2 splits × 4 regimes), read from the `fid_kid.json` files produced above. Compute the SR
@@ -155,5 +158,5 @@ per-sample tables, or directly from the `fid_kid.json` outputs).
 
 `common.py` (checkpoint/DINO resolution, model loading, `compute_metrics`, `SampleWriter`) ·
 `eval_sr.py` · `eval_op.py` · `eval_pyramid.py` · `eval_ext.py` + `metrics_ext.py` ·
-`caption_agree.py` · `compute_fid_kid.py` · `aggregate.py` · wrappers `run_eval_sr.sh` (Table 2) /
-`run_eval_sr_ablation.sh` (Table 5) / `run_eval_op.sh` (Table 3).
+`caption_agree.py` · `compute_fid_kid.py` · `aggregate.py` · wrappers `run_eval_sr.sh` (SR) /
+`run_eval_sr_ablation.sh` (SR ablation) / `run_eval_op.sh` (OP).

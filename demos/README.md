@@ -259,7 +259,7 @@ Procedure SeamFix(leaf):                                ▷ not confined to the 
 ⇒ ≤ 49 OP windows for the lateral fill, plus one SR (D-1→leaf) and the seam-fix
 (≤ `seam_max` OP calls, only where a real seam exceeds the threshold).
 
-**Knobs** (app §3 sliders → `ctx.params`): `arch` / `cfg` / `steps` (the bundle's
+**Knobs** (app parameter sliders → `ctx.params`): `arch` / `cfg` / `steps` (the bundle's
 model size, CFG, diffusion steps); **SR window overlap** = `uni_overlap` and **SR
 warm-start** = `uni_t`, which tune the SR passes only (the greedy outpainting and
 seam-fix use `op_fill`, which has no overlap/t knob). The seam-fix has built-in

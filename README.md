@@ -25,7 +25,8 @@ Google Drive and run inference end-to-end — see
 📖 **Reproducibility docs** live in [`docs/`](docs/): every training and evaluation
 hyperparameter (paper vs. code, per experiment) is tabulated in
 [`docs/HYPERPARAMETERS.md`](docs/HYPERPARAMETERS.md); metric definitions and backends in
-[`docs/METRICS.md`](docs/METRICS.md).
+[`docs/METRICS.md`](docs/METRICS.md) (tile SR/OP) and
+[`docs/METRICS_DENSE500.md`](docs/METRICS_DENSE500.md) (dense500 pyramid).
 
 ---
 
@@ -128,8 +129,8 @@ Curriculum stage map, architecture, full CLI flag list →
 ## Quick start — Evaluation
 
 Evaluation lives in [`src/eval/`](src/eval/) and reproduces the **Genesis (B/16 and H/16)**
-numbers in **every paper table** — SR (Table 2), outpainting (Table 3), dense500 pyramid
-completion (Table 4), the SR ablation (Table 5), and mean FID (Table 6). Metrics are
+numbers in **every result table** — super-resolution, outpainting, dense500 pyramid
+completion, the SR ablation, and the mean-FID summary. Metrics are
 PSNR / SSIM / LPIPS / DISTS / B-diff (OP) / FID for the tile tasks, plus CLIP-I / DINOv3-sat /
 Caption and LR-PSNR / xLR-PSNR / RAPSD for the pyramid — all library-backed; see
 [`docs/METRICS.md`](docs/METRICS.md). Checkpoints and the dense500 benchmark
@@ -138,18 +139,18 @@ auto-download on first use.
 ```bash
 cd src/eval
 
-# SR (Table 2): score a checkpoint on a split (writes samples.csv + images), then FID
+# Super-resolution: score a checkpoint on a split (writes samples.csv + images), then FID
 EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test OUT_DIR=results/sr_h16_random ./run_eval_sr.sh
 python compute_fid_kid.py --root results --pattern sr_h16_random --partition parent_zl
 
-# Outpainting (Table 3): one mask regime at a time
+# Outpainting: one mask regime at a time
 REGIME=quad1 EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test ./run_eval_op.sh
 
 # pivot samples.csv into the paper layout
 python aggregate.py --task sr --metric lpips --pivot exp --columns split,zl_bucket
 ```
 
-The full per-table recipe (including dense500 generation + scoring for Table 4) is in
+The full per-table recipe (including dense500 generation + scoring) is in
 **[`src/eval/README.md`](src/eval/README.md)**. Comparison baselines are not included — this
 repo evaluates our checkpoints only.
 

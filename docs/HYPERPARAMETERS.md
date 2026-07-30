@@ -1,18 +1,18 @@
 # Genesis — Experiments & Hyperparameters
 
 A single reproducibility reference for **every training and evaluation experiment**.
-Each value is cross-checked against the **paper** (SIGSPATIAL'26; Tables 7/8, §5.1–5.5,
-Appendix A) and the **code** (defaults in `src/…` and the `logs/eval_table*.sh` runners).
+Each value is cross-checked against the **paper** (SIGSPATIAL'26) and the **code**
+(defaults in `src/…` and the `logs/eval_table*.sh` runners).
 Where the paper abstracts a value (e.g. "batch size 256"), the concrete code decomposition
 is given. Numbers here are the *paper-faithful defaults* — running the referenced scripts
 with no overrides reproduces the paper.
 
 > Model note: the backbone key in code is `JiT-B/16` or `JiT-H/16` for both operators; the
-> per-operator **patch size** is **32 (SR)** and **16 (OP)** (paper §5.1).
+> per-operator **patch size** is **32 (SR)** and **16 (OP)** (per the paper's training setup).
 
 ---
 
-## 1. Data splits — paper Table 7
+## 1. Data splits
 
 Complete quads = parents whose four `z+1` children all exist. Training additionally uses
 partial quads (1–3 children) for the masked losses.
@@ -26,11 +26,11 @@ partial quads (1–3 children) for the masked losses.
 | Val (random) | 5,000 | 24,969 |
 
 Split index lists live in `git10m_quad_meta.json` (`splits` key). Tiles come from
-🤗 `lcybuaa/Git-10M`. **Source:** paper §A.1; `src/dataprep/`.
+🤗 `lcybuaa/Git-10M`. **Source:** paper (data-splits appendix); `src/dataprep/`.
 
 ---
 
-## 2. Training hyperparameters — paper Table 8
+## 2. Training hyperparameters
 
 Global batch **256** = `batch_size 32 × accumulate_grad_batches 4 × devices 2`.
 Curriculum boundaries at **20/40/60%** of the step budget → **160k / 320k / 480k** of 800k
@@ -53,16 +53,16 @@ Curriculum boundaries at **20/40/60%** of the step budget → **160k / 320k / 48
 | Noise schedule (P_mean, P_std) | (−0.8, 0.8) | (−0.8, 0.8) | `--P_mean -0.8 --P_std 0.8` (logit-normal) |
 | Noise scale | 1.0 | 1.0 | `--noise_scale 1.0` |
 | Curriculum boundaries | 20/40/60% | 20/40/60% | auto-computed from `max_steps` |
-| Conditioning dropout (pₐᵣₒₚ) | 0.1 | 0.1 | (paper §5.2) |
+| Conditioning dropout (pₐᵣₒₚ) | 0.1 | 0.1 | (paper, operator setup) |
 | DINOv3-sat conditioning | **on** (frozen ViT-L) | **off** | SR `NO_DINO=0` · OP `NO_DINO=1` |
 | Aux per-quadrant LPIPS λ_perc | **0.5** | — | SR `--lpips_weight 0.5` |
 | Time-weighting | — | **off** | OP `--no-enable_time_weight` |
 
-**Source:** paper Table 8 + §5.1–5.2; code `src/superresolution/main.py`,
+**Source:** paper (training hyperparameters + operator setup); code `src/superresolution/main.py`,
 `src/outpainting/main.py`, launchers `src/superresolution/run_sr.sh`,
 `src/outpainting/run_op.sh`.
 
-### 2.1 Curriculum stages (paper §5.1)
+### 2.1 Curriculum stages
 
 | Stage (step %) | SR (over parent zoom; coarse = parent ≤ z15) | OP (over mask) |
 |---|---|---|
@@ -73,7 +73,7 @@ Curriculum boundaries at **20/40/60%** of the step budget → **160k / 320k / 48
 
 ---
 
-## 3. Inference sampler (per-operator eval) — paper §5.1–5.2
+## 3. Inference sampler (per-operator eval)
 
 | Setting | Value | Note |
 |---|---|---|
@@ -83,14 +83,14 @@ Curriculum boundaries at **20/40/60%** of the step budget → **160k / 320k / 48
 | SR bicubic warm-start (τ) | **context-dependent** | see per-table rows below |
 
 **Bicubic warm-start (SDEdit) — where each τ applies:**
-- **Table 2 (main SR eval): OFF** — sampled from pure noise (the Table-2 launcher passes no
+- **Main SR eval: OFF** — sampled from pure noise (the main-SR launcher passes no
   `--bicubic_init`; our reproduction matched the paper this way).
-- **Table 5 (SR ablation): ON, τ = 0.5** — the "bicubic-init SR setting" (paper §6.1, §5.2).
-- **Table 4 (pyramid SR pass): ON, τ = 0.4** — MultiDiffusion warm-start over the mosaic (§5.4).
+- **SR ablation: ON, τ = 0.5** — the paper's "bicubic-init SR setting".
+- **Pyramid SR pass (dense500): ON, τ = 0.4** — MultiDiffusion warm-start over the mosaic.
 
 ---
 
-## 4. Table 2 — Super-resolution eval
+## 4. Super-resolution eval
 
 Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (per cell) /
 `logs/eval_table2_sr.sh` (full table).
@@ -112,11 +112,11 @@ Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (pe
 Child-zoom groups & paper N (per split): `z12–15` = 2470 / 3146, `z16–17` = 2003 / 2087,
 `z18` = 4096 / 4096 (random / spatial). *Note:* the paper caps `z18` at 4096; running the
 full split (default) uses all such tiles (~4.7–5.5k) — numbers are effectively identical.
-FID needs the full set (small-N FID is positively biased). **Source:** paper Table 2, §5.5.
+FID needs the full set (small-N FID is positively biased). **Source:** paper (super-resolution results + evaluation protocol).
 
 ---
 
-## 5. Table 3 — Outpainting eval
+## 5. Outpainting eval
 
 **Run:** `src/eval/run_eval_op.sh` (per cell) / `logs/eval_table3_op.sh` (full table).
 
@@ -134,11 +134,11 @@ FID needs the full set (small-N FID is positively biased). **Source:** paper Tab
 | Metrics | LPIPS, DISTS, B-diff, **FID** | hole-aware (synthesized region only) |
 
 B-diff = mean abs pixel difference in a 4-px ring inside the hole boundary. **Source:**
-paper Table 3, §5.5.
+paper (outpainting results).
 
 ---
 
-## 6. Table 5 — SR ablation (DINOv3 × LPIPS)
+## 6. SR ablation (DINOv3 × LPIPS)
 
 **Run:** `src/eval/run_eval_sr_ablation.sh` (per cell) / `logs/eval_table5_ablation.sh` (all 4).
 
@@ -154,17 +154,17 @@ paper Table 3, §5.5.
 | Metrics | PSNR, SSIM, LPIPS, DISTS, FID | — |
 
 The four cells toggle {DINOv3 on/off} × {LPIPS loss on/off}. Ablations are the one experiment
-trained to **500k** (not 800k). **Source:** paper Table 5, §6.1.
+trained to **500k** (not 800k). **Source:** paper (SR ablation).
 
 ---
 
-## 7. Table 4 — dense500 multi-scale pyramid completion
+## 7. dense500 multi-scale pyramid completion
 
 Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (🤗 `dcher95/dense500`).
 **Run:** `python -m pyramid.run_pyramid_eval` (generate) → `eval_pyramid.py` / `eval_ext.py` /
 `caption_agree.py` (score) / `logs/eval_table4_dense500.sh` (all).
 
-### 7.1 Seed protocols (paper §5.5)
+### 7.1 Seed protocols
 | Protocol | Seeds | Tests |
 |---|---|---|
 | A (hardest) | 1 seed, level drawn ∝ tile count | full-pyramid from a single anchor |
@@ -181,29 +181,30 @@ Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (
 | Unified SR warm-start τ | 0.40 | `--uni_t 0.40` |
 | Coverage | 100 sites × 5 windows × 3 protocols = **1500 / arch** | `--sites 0:100 --window 1..5 --protocol A/B/C` |
 
-### 7.3 Pyramid engine (paper §5.4)
+### 7.3 Pyramid engine
 Offset `r=1` (working level = penultimate); SR = MultiDiffusion over the stitched mosaic,
 warm-started at τ=0.4 (256² windows, 32-px overlap, plateau blending); max-coverage OP fills
 2×2 quadrant blocks most-known-first; seam repair on internal leaf boundaries worst-first
 (discontinuity **threshold 14**, up to **64** boundaries, 64-px masked band, soft-edge blend);
 reconcile = bottom-up downsample only where seam-repair changed children.
 
-### 7.4 Metrics (paper §5.5, A.3–A.5)
+### 7.4 Metrics
 | Group | Metrics | Backend |
 |---|---|---|
 | Image quality | PSNR, SSIM, LPIPS, FID | torchmetrics + torch-fidelity |
 | Semantic | CLIP-I, DINOv3-sat, Caption | open_clip (ViT-B-32) · DINOv3-sat ViT-L · Qwen2.5-VL-3B-Instruct + Sentence-BERT (all-MiniLM-L6-v2) |
 | Consistency | LR-PSNRbox, xLR-PSNR, RAPSD | numpy (box downsample / cross-scale / radial PSD) |
 
-Caption uses `--sites_per_cell 10`. **Source:** paper Table 4, §5.4–5.5, A.3–A.5.
+Caption uses `--sites_per_cell 10`. Full metric definitions (with formulas) are in
+[`METRICS_DENSE500.md`](METRICS_DENSE500.md). **Source:** paper (dense500 pyramid results + metric-details appendix).
 
 ---
 
-## 8. Table 6 — mean FID summary
+## 8. Mean-FID summary
 
 Mean FID over all cells: **6 SR cells** (2 splits × 3 zoom groups) and **8 OP cells**
-(2 splits × 4 regimes), per model. Derived from Tables 2 and 3 — no separate run. Paper:
-SR Genesis-H 12.64 / Genesis-B 14.43; OP Genesis-H 9.12. **Source:** paper Table 6.
+(2 splits × 4 regimes), per model. Derived from the SR and OP results — no separate run.
+Paper: SR Genesis-H 12.64 / Genesis-B 14.43; OP Genesis-H 9.12. **Source:** paper (mean-FID summary).
 
 ---
 
@@ -223,11 +224,11 @@ Auto-pulled to `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`) via an rclone 
 
 ## 10. Quick reproduction map
 
-| Paper table | What | Script (defaults reproduce it) |
+| Experiment | What | Script (defaults reproduce it) |
 |---|---|---|
-| Table 2 | SR (PSNR/SSIM/LPIPS/DISTS/FID) | `logs/eval_table2_sr.sh` → `src/eval/run_eval_sr.sh` |
-| Table 3 | OP (LPIPS/DISTS/B-diff/FID) | `logs/eval_table3_op.sh` → `src/eval/run_eval_op.sh` |
-| Table 4 | dense500 pyramid | `logs/eval_table4_dense500.sh` → `pyramid.run_pyramid_eval` + `eval_{pyramid,ext}.py` + `caption_agree.py` |
-| Table 5 | SR ablation | `logs/eval_table5_ablation.sh` → `src/eval/run_eval_sr_ablation.sh` |
-| Table 6 | mean FID | emitted by the Table 2 & Table 3 runs |
-| Table 8 | training | `src/superresolution/run_sr.sh`, `src/outpainting/run_op.sh` |
+| Super-resolution | PSNR/SSIM/LPIPS/DISTS/FID | `logs/eval_table2_sr.sh` → `src/eval/run_eval_sr.sh` |
+| Outpainting | LPIPS/DISTS/B-diff/FID | `logs/eval_table3_op.sh` → `src/eval/run_eval_op.sh` |
+| dense500 pyramid | image quality + semantic + consistency | `logs/eval_table4_dense500.sh` → `pyramid.run_pyramid_eval` + `eval_{pyramid,ext}.py` + `caption_agree.py` |
+| SR ablation | DINOv3 × LPIPS | `logs/eval_table5_ablation.sh` → `src/eval/run_eval_sr_ablation.sh` |
+| Mean FID | mean over SR + OP cells | emitted by the SR & OP runs |
+| Training | hyperparameters | `src/superresolution/run_sr.sh`, `src/outpainting/run_op.sh` |
