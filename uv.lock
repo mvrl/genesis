@@ -536,6 +536,7 @@ dependencies = [
     { name = "sentence-transformers" },
     { name = "shapely" },
     { name = "torch" },
+    { name = "torch-fidelity" },
     { name = "torchmetrics" },
     { name = "torchvision" },
     { name = "tqdm" },
@@ -569,6 +570,7 @@ requires-dist = [
     { name = "sentence-transformers", specifier = ">=3.0" },
     { name = "shapely", specifier = "==2.1.2" },
     { name = "torch", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu128" },
+    { name = "torch-fidelity", specifier = "==0.4.0" },
     { name = "torchmetrics", specifier = "==1.8.2" },
     { name = "torchvision", specifier = "==0.23.0", index = "https://download.pytorch.org/whl/cu128" },
     { name = "tqdm", specifier = "==4.67.1" },
@@ -1206,6 +1208,7 @@ dependencies = [
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/ed/e8/c2959c0f969ea4ae96b55ad10c108c0410de4e8b3550d9941a4cfdd52703/opencv_python-4.14.0.94.tar.gz", hash = "sha256:afadc76a38a07713a4c2b4702da917cf0ed489be57e2a40a34e670189731de7d", size = 96400225, upload-time = "2026-07-28T19:23:09.546Z" }
 wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/91/e4fd7c2b64fda9792bc1f5dcb5a6cbdb54d50c3a2fa9dccc3943fd47afcf/opencv_python-4.14.0.94-cp37-abi3-macosx_13_0_arm64.whl", hash = "sha256:04456937c8f12ca64ff94df8bfd813ca98f5c9767da792948969a759c716ebe2", size = 46491087, upload-time = "2026-07-29T03:52:01.842Z" },
     { url = "https://files.pythonhosted.org/packages/f4/a7/8895ca8731f741925acf238f87ccb21fa8f47378d5291792e932b9a4ab71/opencv_python-4.14.0.94-cp37-abi3-macosx_14_0_x86_64.whl", hash = "sha256:6a49842cc0ba9f43e35a289e61c0e15a1f8be8df60145ee5c7d42593b0d4f4b8", size = 33084035, upload-time = "2026-07-28T20:05:52.633Z" },
     { url = "https://files.pythonhosted.org/packages/84/ec/5777752567986b99222d52e22306e9616829480cc2d48ab241daa9d7e9ef/opencv_python-4.14.0.94-cp37-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:3198fcbcb8f98fd68063bf2c75d129b0f50d46e555a4e47578a6eb086eb38e1f", size = 49513397, upload-time = "2026-07-28T19:17:28.309Z" },
     { url = "https://files.pythonhosted.org/packages/13/09/c05887c383caa9080ef612febffd08c5da1c283418687a3bea6ef7fb6faa/opencv_python-4.14.0.94-cp37-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:4ae0b5a2acbcfb9813035f1644cfba751edd02797fac994e32180813eeef8420", size = 72049625, upload-time = "2026-07-28T19:18:11.767Z" },
@@ -2012,6 +2015,22 @@ wheels = [
     { url = "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp313-cp313-win_amd64.whl", hash = "sha256:9e20646802b7fc295c1f8b45fefcfc9fb2e4ec9cbe8593443cd2b9cc307c8405", upload-time = "2025-10-01T23:53:20Z" },
     { url = "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp313-cp313t-manylinux_2_28_x86_64.whl", hash = "sha256:4295a22d69408e93d25f51e8d5d579345b6b802383e9414b0f3853ed433d53ae", upload-time = "2025-10-01T23:54:56Z" },
     { url = "https://download-r2.pytorch.org/whl/cu128/torch-2.8.0%2Bcu128-cp313-cp313t-win_amd64.whl", hash = "sha256:970b4f4661fa7b44f6a7e6df65de7fc4a6fff2af610dc415c1d695ca5f1f37d2", upload-time = "2025-10-01T23:55:23Z" },
+]
+
+[[package]]
+name = "torch-fidelity"
+version = "0.4.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/37/94e4d31a157bae81622557b7f94f93ca3749e6b592203633858dbca8c835/torch_fidelity-0.4.0.tar.gz", hash = "sha256:73548b97f1a844cb94dee7736c8485cbf1e5ae43670679f62ffb7bbb8bb3d455", size = 1349034, upload-time = "2026-02-17T21:04:57.976Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/27/35/e0988c963538d155befe1c4e1b90ff2925eaa40acc27fb2bba737dcb7288/torch_fidelity-0.4.0-py3-none-any.whl", hash = "sha256:99f4c610ea16972628eceb26afb0008e528da2d44123db947b408750efbd35d4", size = 85594, upload-time = "2026-02-17T21:04:56.166Z" },
 ]
 
 [[package]]

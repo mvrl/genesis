@@ -164,9 +164,9 @@ def _ckpt_path_for_exp(task: str, exp: str, stage: int) -> str:
         if stage not in _SR_ABL_FNAME:
             raise ValueError(f"SR ablations only ship at stage 3 (got --stage {stage}).")
         fname = _SR_ABL_FNAME[stage]
-        # Ablation ckpts are published on Google Drive under `ablations/`, so
-        # they auto-pull exactly like the main ckpts below.
-        return os.path.join(_CKPT_BASE, "ablations", task_dir, exp, fname)
+        # Ablation ckpts are published on Google Drive under `ablations/<exp>/`
+        # (SR-only, so no per-task subfolder) and auto-pull like the main ckpts.
+        return os.path.join(_CKPT_BASE, "ablations", exp, fname)
 
     if exp in _MAIN_EXP_TO_ARCH_DIR:
         arch_dir = _MAIN_EXP_TO_ARCH_DIR[exp]

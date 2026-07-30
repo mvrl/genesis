@@ -27,6 +27,7 @@ dependencies = [
     "wandb==0.22.1",
     # ── reference metrics (SR / OP / pyramid) ────────────────────────────────
     "torchmetrics==1.8.2",
+    "torch-fidelity==0.4.0",   # FID backend for torchmetrics FrechetInceptionDistance (lazy import)
     "lpips==0.1.4",
     "DISTS-pytorch==0.1",
     # ── Hugging Face stack (Git-10M + dense500 datasets; Qwen2.5-VL caption) ──
