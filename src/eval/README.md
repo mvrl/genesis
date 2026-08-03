@@ -43,18 +43,18 @@ cd src/eval
 
 ## Super-resolution
 
-`eval_sr.py` (via `run_eval_sr.sh`) scores a checkpoint on a Git-10M split, writing per-sample
-`samples.csv` **and** `predictions/`+`targets/` PNGs; FID is then computed over those PNGs,
-stratified by child-zoom group. Do this for each model × split:
+`eval_sr.py` (via `run_eval_sr.sh`) scores a checkpoint on a Git-10M split per child-zoom group,
+writing per-sample `samples.csv` **and** `predictions/`+`targets/` PNGs, then FID over those PNGs.
+The paper caps each group at **4096 samples** (`run_eval_sr.sh` default `MAX_SAMPLES=4096`; z12-15 /
+z16-17 fall under it, z18 → 4096). Loop the three groups for each model × split:
 
 ```bash
-# JiT-H/16, random_test  (repeat with SPLIT=spatial_test, and MODEL/EXP for B/16)
-EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test OUT_DIR=results/sr_h16_random ./run_eval_sr.sh
-EXP=main_b16 MODEL=JiT-B/16 SPLIT=random_test OUT_DIR=results/sr_b16_random ./run_eval_sr.sh
-# … and SPLIT=spatial_test for both
-
-# FID per child-zoom group (writes fid_kid.json → fid only) for each SR output dir
-python compute_fid_kid.py --root results --pattern sr_h16_random --partition parent_zl
+# JiT-H/16, random_test  (repeat with SPLIT=spatial_test, and MODEL=JiT-B/16 EXP=main_b16)
+for G in z12-15 z16-17 z18; do
+  EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test OUT_DIR=results/sr_h16_random_$G \
+    ./run_eval_sr.sh --child_zl_group $G
+  python compute_fid_kid.py --root results --pattern sr_h16_random_$G
+done
 ```
 
 Aggregate the reconstruction/perceptual columns into the Table-2 layout:

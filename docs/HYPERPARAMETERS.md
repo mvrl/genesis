@@ -90,7 +90,36 @@ Curriculum boundaries at **20/40/60%** of the step budget → **160k / 320k / 48
 
 ---
 
-## 4. Super-resolution eval
+## 4. Evaluation sample counts (N per cell)
+
+Realized N for **every evaluation cell** across the results tables (all except the mean-FID
+summary, which is derived from the SR + OP FIDs). **FID is the only count-sensitive metric** —
+these counts are exactly what make FID reproduce the paper; PSNR / SSIM / LPIPS / DISTS / B-diff
+and the dense500 semantic / consistency metrics are count-independent averages.
+
+| Experiment | Split | Sub-group | N per cell |
+|---|---|---|---|
+| **Super-resolution** | random_test | child z12-15 | **2,470** |
+| | random_test | child z16-17 | **2,003** |
+| | random_test | child z18 | **4,096** (cap) |
+| | spatial_test | child z12-15 | **3,146** |
+| | spatial_test | child z16-17 | **2,087** |
+| | spatial_test | child z18 | **4,096** (cap) |
+| **Outpainting** | random_test & spatial_test | quad3 / quad2_adj / quad2_diag / quad1 | **8,192** each |
+| **dense500** | 500-site benchmark | protocol A / B / C | **500 sites** each |
+| **SR ablation** | val_spatial | 4 DINOv3×LPIPS cells | **5,000** each |
+
+**Totals** — SR: **8,569** (random) / **9,329** (spatial) · OP: **32,768** per split (4 × 8,192) ·
+dense500: **1,500** pyramids/arch (500 sites × 3 protocols) · ablation: **20,000** (4 × 5,000).
+
+**SR is a per-group cap:** 4,096 is a *cap*, not the realized N — z12-15 / z16-17 fall under it
+(run in full), z18 is capped to 4,096. **Ready-to-use table headings** — SR:
+`z12-15 (N=2470 random / 3146 spatial)`, `z16-17 (N=2003 random / 2087 spatial)`,
+`z18 (N=4096 for both)`; OP: `(N=8192)`.
+
+---
+
+## 5. Super-resolution eval
 
 Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (per cell) /
 `logs/eval_table2_sr.sh` (full table).
@@ -104,19 +133,19 @@ Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (pe
 | CFG / steps | 1.0 / 50 | `--cfg 1.0 --num_sampling_steps 50` |
 | Bicubic-init | **off** | (no `--bicubic_init`) |
 | DINOv3-sat | on | (default) |
-| Samples | **full split**, per child-zoom group | `--max_samples 0 --child_zl_group {z12-15,z16-17,z18}` |
+| Samples | **4096 per child-zoom group** (cap) | `--max_samples 4096 --child_zl_group {z12-15,z16-17,z18}` |
 | LPIPS max size | 1024 | `--lpips_max_size 1024` |
 | Seed | 42 | `--seed 42` |
 | Metrics | PSNR, SSIM, LPIPS, DISTS, **FID** | — |
 
-Child-zoom groups & paper N (per split): `z12–15` = 2470 / 3146, `z16–17` = 2003 / 2087,
-`z18` = 4096 / 4096 (random / spatial). *Note:* the paper caps `z18` at 4096; running the
-full split (default) uses all such tiles (~4.7–5.5k) — numbers are effectively identical.
-FID needs the full set (small-N FID is positively biased). **Source:** paper (super-resolution results + evaluation protocol).
+Realized N per group × split is in the consolidated **Evaluation sample counts** table (§4);
+`--max_samples 4096` is a per-group cap (z12-15 / z16-17 run in full, z18 → 4096). FID is the only
+count-sensitive metric, so this cap is what makes FID match the paper. **Source:** paper
+(super-resolution results + evaluation protocol).
 
 ---
 
-## 5. Outpainting eval
+## 6. Outpainting eval
 
 **Run:** `src/eval/run_eval_op.sh` (per cell) / `logs/eval_table3_op.sh` (full table).
 
@@ -128,17 +157,21 @@ FID needs the full set (small-N FID is positively biased). **Source:** paper (su
 | Mask regimes | quad3, quad2_adj, quad2_diag, quad1 | `--regime` |
 | CFG / steps | 1.0 / 50 | `--cfg 1.0 --num_sampling_steps 50` |
 | DINOv3-sat | **off** (OP is no-DINO) | `--no_dino` |
-| Samples | **full split** (~50k/regime) | `--max_samples 0` |
+| Samples | **8192 per split/regime** | `--max_samples 8192` |
 | LPIPS max size | 0 (full-res, 256²) | `--lpips_max_size 0` |
 | Seed | 42 | `--seed 42` |
 | Metrics | LPIPS, DISTS, B-diff, **FID** | hole-aware (synthesized region only) |
 
-B-diff = mean abs pixel difference in a 4-px ring inside the hole boundary. **Source:**
-paper (outpainting results).
+B-diff = mean abs pixel difference in a 4-px ring inside the hole boundary.
+
+Realized N per cell = 8192 per split × regime (see the consolidated **Evaluation sample counts**
+table, §4). As in SR, FID is the only count-sensitive metric — 8192 is what makes FID match the
+paper (full ~50k gives a lower, less-biased FID). **Source:** paper (outpainting results; 8192
+from the OP eval launcher `submit_outpainting_full.sh`).
 
 ---
 
-## 6. SR ablation (DINOv3 × LPIPS)
+## 7. SR ablation (DINOv3 × LPIPS)
 
 **Run:** `src/eval/run_eval_sr_ablation.sh` (per cell) / `logs/eval_table5_ablation.sh` (all 4).
 
@@ -158,20 +191,20 @@ trained to **500k** (not 800k). **Source:** paper (SR ablation).
 
 ---
 
-## 7. dense500 multi-scale pyramid completion
+## 8. dense500 multi-scale pyramid completion
 
 Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (🤗 `dcher95/dense500`).
 **Run:** `python -m pyramid.run_pyramid_eval` (generate) → `eval_pyramid.py` / `eval_ext.py` /
 `caption_agree.py` (score) / `logs/eval_table4_dense500.sh` (all).
 
-### 7.1 Seed protocols
+### 8.1 Seed protocols
 | Protocol | Seeds | Tests |
 |---|---|---|
 | A (hardest) | 1 seed, level drawn ∝ tile count | full-pyramid from a single anchor |
 | B | 3 independent seeds, one per non-root level | multi-scale reconciliation |
 | C (easiest) | 4 spatially independent (2 leaf + 1 D-1 + 1 D-2) | dense leaf anchors under coarse guidance |
 
-### 7.2 Generation config (campaign `worker.sh`)
+### 8.2 Generation config (campaign `worker.sh`)
 | Setting | Value | Flag |
 |---|---|---|
 | Checkpoints | SR + OP main, 800k | `--arch JiT-{B,H}/16` |
@@ -181,14 +214,14 @@ Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (
 | Unified SR warm-start τ | 0.40 | `--uni_t 0.40` |
 | Coverage | 100 sites × 5 windows × 3 protocols = **1500 / arch** | `--sites 0:100 --window 1..5 --protocol A/B/C` |
 
-### 7.3 Pyramid engine
+### 8.3 Pyramid engine
 Offset `r=1` (working level = penultimate); SR = MultiDiffusion over the stitched mosaic,
 warm-started at τ=0.4 (256² windows, 32-px overlap, plateau blending); max-coverage OP fills
 2×2 quadrant blocks most-known-first; seam repair on internal leaf boundaries worst-first
 (discontinuity **threshold 14**, up to **64** boundaries, 64-px masked band, soft-edge blend);
 reconcile = bottom-up downsample only where seam-repair changed children.
 
-### 7.4 Metrics
+### 8.4 Metrics
 | Group | Metrics | Backend |
 |---|---|---|
 | Image quality | PSNR, SSIM, LPIPS, FID | torchmetrics + torch-fidelity |
@@ -200,7 +233,7 @@ Caption uses `--sites_per_cell 10`. Full metric definitions (with formulas) are 
 
 ---
 
-## 8. Mean-FID summary
+## 9. Mean-FID summary
 
 Mean FID over all cells: **6 SR cells** (2 splits × 3 zoom groups) and **8 OP cells**
 (2 splits × 4 regimes), per model. Derived from the SR and OP results — no separate run.
@@ -208,7 +241,7 @@ Paper: SR Genesis-H 12.64 / Genesis-B 14.43; OP Genesis-H 9.12. **Source:** pape
 
 ---
 
-## 9. Checkpoints (Google Drive release `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`)
+## 10. Checkpoints (Google Drive release `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`)
 
 | Experiment | Path under release | Steps |
 |---|---|---|
@@ -222,7 +255,7 @@ Auto-pulled to `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`) via an rclone 
 
 ---
 
-## 10. Quick reproduction map
+## 11. Quick reproduction map
 
 | Experiment | What | Script (defaults reproduce it) |
 |---|---|---|

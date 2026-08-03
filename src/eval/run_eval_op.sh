@@ -34,7 +34,7 @@ REGIME="${REGIME:-quad1}"         # quad1 / quad2_adj / quad2_diag / quad3
 CFG="${CFG:-1.0}"
 STEPS="${STEPS:-50}"
 
-MAX_SAMPLES="${MAX_SAMPLES:-0}"
+MAX_SAMPLES="${MAX_SAMPLES:-8192}"          # paper Table 3: 8192 per split/regime (0 = full split)
 BATCH_SIZE="${BATCH_SIZE:-16}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
 DEVICE="${DEVICE:-cuda}"

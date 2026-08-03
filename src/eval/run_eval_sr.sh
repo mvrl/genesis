@@ -35,7 +35,7 @@ STEPS="${STEPS:-50}"
 BICUBIC_INIT="${BICUBIC_INIT:-0}"           # 1 → enable SDEdit warm start
 BICUBIC_INIT_T_START="${BICUBIC_INIT_T_START:-0.5}"
 
-MAX_SAMPLES="${MAX_SAMPLES:-0}"
+MAX_SAMPLES="${MAX_SAMPLES:-4096}"          # paper Table 2: 4096 per child-zoom group (0 = full split)
 BATCH_SIZE="${BATCH_SIZE:-4}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
 DEVICE="${DEVICE:-cuda}"
