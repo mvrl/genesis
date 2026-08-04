@@ -1,5 +1,6 @@
 import argparse
 import os
+import torch
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
@@ -134,17 +135,31 @@ def main(args):
         fname_prefix=args.ckpt_prefix,
     )
 
+    # Device auto-detection: GPU is strongly recommended for training. If no CUDA
+    # device is present, fall back to CPU (single process, full precision) so the
+    # run still starts instead of crashing on accelerator="gpu".
+    if torch.cuda.is_available():
+        accelerator = "gpu"
+        precision = args.precision
+    else:
+        print("[info] No CUDA GPU detected — training on CPU (very slow; single process, precision=32).")
+        accelerator = "cpu"
+        devices = 1
+        num_devices = 1
+        args.num_devices = 1
+        precision = "32"
+
     strategy = "auto"
     if num_devices > 1:
         strategy = DDPStrategy(find_unused_parameters=True)
 
     trainer = pl.Trainer(
         max_steps=args.max_steps,
-        accelerator="gpu",
+        accelerator=accelerator,
         devices=devices,
         strategy=strategy,
         logger=logger,
-        precision=args.precision,
+        precision=precision,
         reload_dataloaders_every_n_epochs=1,
         gradient_clip_val=args.gradient_clip_val,
         check_val_every_n_epoch=1,

@@ -37,7 +37,16 @@ STEPS="${STEPS:-50}"
 MAX_SAMPLES="${MAX_SAMPLES:-8192}"          # paper Table 3: 8192 per split/regime (0 = full split)
 BATCH_SIZE="${BATCH_SIZE:-16}"
 NUM_WORKERS="${NUM_WORKERS:-4}"
-DEVICE="${DEVICE:-cuda}"
+# Device: GPU is strongly recommended (CPU works but is far slower). If DEVICE is
+# unset we auto-detect CUDA and fall back to CPU; override with DEVICE=cuda/cpu.
+if [[ -z "${DEVICE:-}" ]]; then
+  if python -c "import torch,sys; sys.exit(0 if torch.cuda.is_available() else 1)" 2>/dev/null; then
+    DEVICE="cuda"
+  else
+    DEVICE="cpu"
+    echo "[info] No CUDA GPU detected — running on CPU (much slower). Set DEVICE=cuda to force." >&2
+  fi
+fi
 SEED="${SEED:-42}"
 
 METRICS="${METRICS:-psnr,ssim,lpips,dists,boundary_diff}"
