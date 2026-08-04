@@ -16,7 +16,7 @@ _CKPT_BASE = os.environ.get("GENESIS_CKPT_BASE") or os.path.join(
 
 def get_args_parser():
     parser = argparse.ArgumentParser("JiT SuperRes")
-    parser.add_argument('--model', default='JiT-H/16', type=str)
+    parser.add_argument('--model', default='JiT-B/16', type=str)
     parser.add_argument('--img_size', default=256, type=int, help="Parent tile size (256)")
     parser.add_argument('--output_size', default=512, type=int, help="Child/output image size (2x img_size)")
     parser.add_argument('--use_dino', default=True,

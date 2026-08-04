@@ -15,7 +15,7 @@ _CKPT_BASE = os.environ.get("GENESIS_CKPT_BASE") or os.path.join(
 
 def get_args_parser():
     parser = argparse.ArgumentParser("JiT Outpainting")
-    parser.add_argument('--model', default='JiT-H/16', type=str)
+    parser.add_argument('--model', default='JiT-B/16', type=str)
     parser.add_argument('--img_size', default=256, type=int)
     parser.add_argument('--max_steps', default=800000, type=int,
                         help="Total training steps. Stage boundaries are auto-computed from this.")

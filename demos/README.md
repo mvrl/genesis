@@ -60,7 +60,7 @@ rclone copy gdrive:dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth \
                                   logs/ckpts/      --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress
 ```
 
-Full Google Drive layout in the root [`README.md`](../README.md#pretrained-checkpoints).
+Full Google Drive layout in the root [`README.md`](../README.md) (see *Data & weights*).
 
 ---
 

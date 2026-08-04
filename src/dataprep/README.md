@@ -115,7 +115,8 @@ Two mechanisms ensure no eval image can appear as a training conditioning input:
 
 ### Split integrity verification
 
-Run `verify_splits.py` (or the inline probe in `build_quad_splits_hf.py` comments) to confirm:
+The build script prints a verification pass at the end of its run (the `VERIFICATION` block,
+shown in the sample output `build_quad_splits_hf.txt`) confirming:
 
 | Check | Result | Meaning |
 |-------|--------|---------|

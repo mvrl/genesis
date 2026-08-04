@@ -1,165 +1,76 @@
 # Genesis
 
-A Generative Engine for Hierarchical Satellite Image Synthesis.
+**A Generative Engine for Hierarchical Satellite Image Synthesis** — SIGSPATIAL'26.
+
+Genesis completes a sparse set of seed satellite tiles into a full, zoomable Web-Mercator
+**quadtree** — filling every scale and location — with two flow-matching *JiT* operators
+(parent-conditional super-resolution + mask-based outpainting) composed into one pyramid engine.
+
+![Genesis: sparse seed tiles → full multi-scale quadtree](assets/task.png)
+
+## How it works
+
+From the input seeds, the pyramid engine (1) takes the seed tiles, (2) brings them to a common
+working level, (3) greedily out-paints to complete that level, (4–5) super-resolves down to the
+leaf tiles, and (6) fills the coarser levels by downsampling — yielding a pyramid that is
+consistent across scales and honors every seed.
+
+![The Genesis pyramid-completion pipeline](assets/pipeline.png)
+
+## Repository
 
 ```
 src/
 ├── superresolution/   # Parent-conditional 256 → 512 SR (ZL → ZL+1)
 ├── outpainting/       # Mask-based 256×256 image completion
 ├── pyramid/           # Full-pyramid generation engine (multi-scale tile completion)
-├── eval/              # Per-sample + pyramid evaluation (reproduces the paper tables)
+├── eval/              # Per-sample + pyramid evaluation
 ├── dataprep/          # One-shot scripts to build the shared meta + hierarchy
 └── util/              # Shared building blocks (RoPE, RMSNorm, sin-cos pos embed)
 ```
 
-| Task | Directory | Launcher | README |
-|------|-----------|----------|--------|
-| Super-resolution | [`src/superresolution/`](src/superresolution/) | `run_sr.sh` | [`src/superresolution/README.md`](src/superresolution/README.md) |
-| Outpainting | [`src/outpainting/`](src/outpainting/) | `run_op.sh` | [`src/outpainting/README.md`](src/outpainting/README.md) |
-| Evaluation | [`src/eval/`](src/eval/) | `run_eval_sr.sh` / `run_eval_op.sh` | [`src/eval/README.md`](src/eval/README.md) + [`docs/METRICS.md`](docs/METRICS.md) |
+## Documentation
 
-Interactive demos under [`demos/`](demos/) auto-fetch checkpoints from
-Google Drive and run inference end-to-end — see
-[`demos/README.md`](demos/README.md).
-
-📖 **Reproducibility docs** live in [`docs/`](docs/): every training and evaluation
-hyperparameter (paper vs. code, per experiment) is tabulated in
-[`docs/HYPERPARAMETERS.md`](docs/HYPERPARAMETERS.md); metric definitions and backends in
-[`docs/METRICS.md`](docs/METRICS.md) (tile SR/OP) and
-[`docs/METRICS_DENSE500.md`](docs/METRICS_DENSE500.md) (dense500 pyramid).
-
----
+| Guide | What |
+|-------|------|
+| [`docs/EVALUATION.md`](docs/EVALUATION.md) | evaluate the released models on the paper's benchmarks |
+| [`docs/TRAINING.md`](docs/TRAINING.md) | train the SR & OP operators |
+| [`docs/HYPERPARAMETERS.md`](docs/HYPERPARAMETERS.md) | every training/eval hyperparameter + sample count (paper vs. code) |
+| [`docs/METRICS.md`](docs/METRICS.md) · [`docs/METRICS_DENSE500.md`](docs/METRICS_DENSE500.md) | metric definitions (tile · pyramid) |
+| [`demos/README.md`](demos/README.md) | interactive Gradio demos |
 
 ## Installation
 
 Uses [uv](https://docs.astral.sh/uv/). From the repo root:
-
 ```bash
-uv sync                       # creates .venv and installs everything (pinned via uv.lock)
-source .venv/bin/activate     # or prefix each command with `uv run`
+uv sync                     # creates .venv, installs the pinned deps (Python 3.13, torch 2.8 cu128)
+source .venv/bin/activate   # or prefix commands with `uv run`
 ```
-
-`uv sync` installs the exact locked versions (Python 3.13, torch 2.8.0 + CUDA
-12.8). For CPU-only, drop the `pytorch-cu128` index in `pyproject.toml` first.
-Checkpoints, datasets, and weights still download on first use (see below) —
-they are **not** part of the environment.
-
----
+Checkpoints, datasets, and weights are **not** part of the environment — they download on first
+use (below). For CPU-only, drop the `pytorch-cu128` index in `pyproject.toml` first.
 
 ## Data & weights — all on Hugging Face or Google Drive
 
-Every external artifact is hosted on the Hugging Face Hub or the public Google
-Drive release folder (`1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`) and is fetched
-automatically on first use — nothing lives on a private cluster path.
+Every external artifact is fetched automatically on first use — nothing lives on a private path.
 
 | Artifact | Hosted on | How it's obtained |
 |----------|-----------|-------------------|
-| Git-10M tiles (training/eval images) | 🤗 `lcybuaa/Git-10M` | `datasets.load_dataset(...)` (HF cache; override with `$HF_DATASETS_CACHE`) |
-| `git10m_quad_meta.json` (splits) | Google Drive `shared/` | auto-pull to `$GENESIS_CKPT_BASE/shared/` (rclone `gdrive:`); override with `$GENESIS_GIT10M_META` |
-| `hierarchy_index_quad.pkl` (SR parent→child) | Google Drive `shared/` | auto-pull to `$GENESIS_CKPT_BASE/shared/`; override with `$GENESIS_HINDEX` |
-| dense500 benchmark | 🤗 `dcher95/dense500` | auto-download via `pyramid.dataset.GlobalDense` (override with `$GENESIS_DENSE500_REPO`) |
-| Checkpoints — main **and** ablation | Google Drive release | auto-pull to `$GENESIS_CKPT_BASE` (`--exp main_b16 / main_h16 / abl_*`) |
-| DINOv3-sat encoder weights | Google Drive release | auto-pull; override with `$GENESIS_DINO_WEIGHTS` (`NO_DINO=1` to ablate) |
+| Git-10M tiles | 🤗 `lcybuaa/Git-10M` | `datasets.load_dataset(...)` (override cache with `$HF_DATASETS_CACHE`) |
+| Split meta + hierarchy index | Google Drive `shared/` | auto-pull to `$GENESIS_CKPT_BASE/shared/` (rclone `gdrive:`) |
+| dense500 benchmark | 🤗 `dcher95/dense500` | auto-download via `pyramid.dataset.GlobalDense` |
+| Checkpoints (main **and** ablation) | Google Drive release | auto-pull to `$GENESIS_CKPT_BASE` (`--exp main_b16 / main_h16 / abl_*`) |
+| DINOv3-sat encoder weights | Google Drive release | auto-pull; override with `$GENESIS_DINO_WEIGHTS` |
 
-`git10m_quad_meta.json` carries the `splits` key (seeded-shuffled, ZL-balanced
-index lists for `train / val_random / val_spatial / random_test / spatial_test`).
-Set `GENESIS_CKPT_BASE` to choose where Google-Drive files cache (default
-`<repo>/logs/ckpts/`); auto-pull needs an rclone Google Drive remote named
-`gdrive`. See **Pretrained checkpoints** below for the rclone setup.
-
----
-
-## Quick start — Super-resolution
-
-```bash
-cd src/superresolution
-chmod +x run_sr.sh
-
-# Defaults already match the paper main config (DINO + LPIPS 0.5, 800k steps, JiT-B/16).
-# MODEL_SIZE=H16 for the H/16 run; DEVICES=1 for a single GPU (default 2).
-MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh
-
-# Resume:
-RESUME_CKPT=./runs/main_h16/last.ckpt \
-  MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh
-```
-
-> **Global batch = 256** in the paper (`batch_size × accumulate_grad_batches × num_gpus`
-> = 32 × 4 × 2). On one GPU that's 128 — pass `--accumulate_grad_batches 8` to keep 256.
-
-| Var | Default | Purpose |
-|-----|---------|---------|
-| `MODEL_SIZE` | `B16` | `B16` or `H16` |
-| `MAX_STEPS` | `800000` | paper total; curriculum boundaries auto-computed at 20/40/60 % |
-| `NO_DINO` | `0` | `1` = pixel-only conditioning |
-| `LPIPS_WEIGHT` | `0.5` | per-quadrant LPIPS weight (paper main; `0.0` = *_nolpips ablation) |
-| `DEVICES` | `2` | GPU count or `"0,1"` |
-| `WANDB_MODE` | `disabled` | `online` to log to W&B |
-| `RESUME_CKPT` | _(none)_ | Lightning ckpt to resume |
-
-Full ablation matrix, architecture, full CLI flag list →
-[`src/superresolution/README.md`](src/superresolution/README.md).
-
----
-
-## Quick start — Outpainting
-
-```bash
-cd src/outpainting
-chmod +x run_op.sh
-
-# Defaults already match the paper main config (no-DINO + no-time-weight, quadrant
-# curriculum, 800k steps, JiT-B/16). MODEL_SIZE=H16 for H/16; DEVICES=1 for one GPU.
-MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_op.sh
-```
-
-| Var | Default | Purpose |
-|-----|---------|---------|
-| `MODEL_SIZE` | `B16` | `B16` or `H16` |
-| `MAX_STEPS` | `800000` | paper total; curriculum boundaries auto-computed at 20/40/60 % |
-| `DEVICES` | `2` | GPU count or `"0,1"` |
-| `WANDB_MODE` | `disabled` | `online` to log to W&B |
-| `RESUME_CKPT` | _(none)_ | Lightning ckpt to resume |
-
-Curriculum stage map, architecture, full CLI flag list →
-[`src/outpainting/README.md`](src/outpainting/README.md).
-
----
-
-## Quick start — Evaluation
-
-Evaluation lives in [`src/eval/`](src/eval/) and reproduces the **Genesis (B/16 and H/16)**
-numbers in **every result table** — super-resolution, outpainting, dense500 pyramid
-completion, the SR ablation, and the mean-FID summary. Metrics are
-PSNR / SSIM / LPIPS / DISTS / B-diff (OP) / FID for the tile tasks, plus CLIP-I / DINOv3-sat /
-Caption and LR-PSNR / xLR-PSNR / RAPSD for the pyramid — all library-backed; see
-[`docs/METRICS.md`](docs/METRICS.md). Checkpoints and the dense500 benchmark
-auto-download on first use.
-
-```bash
-cd src/eval
-
-# Super-resolution: score a checkpoint on a split (writes samples.csv + images), then FID
-EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test OUT_DIR=results/sr_h16_random ./run_eval_sr.sh
-python compute_fid_kid.py --root results --pattern sr_h16_random --partition parent_zl
-
-# Outpainting: one mask regime at a time
-REGIME=quad1 EXP=main_h16 MODEL=JiT-H/16 SPLIT=random_test ./run_eval_op.sh
-
-# pivot samples.csv into the paper layout
-python aggregate.py --task sr --metric lpips --pivot exp --columns split,zl_bucket
-```
-
-The full per-table recipe (including dense500 generation + scoring) is in
-**[`src/eval/README.md`](src/eval/README.md)**. Comparison baselines are not included — this
-repo evaluates our checkpoints only.
-
----
+Google-Drive pulls need an rclone remote named `gdrive` (folder
+`1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`, shared "anyone with the link"): `rclone config` → `n` → `drive`
+→ accept defaults → OAuth. Files cache under `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts/`).
+To pre-download everything: `bash src/eval/download_ckpts.sh` (details in
+[`docs/EVALUATION.md`](docs/EVALUATION.md)).
 
 ## Quick start — Demo
 
-The flagship demo is the **full-pyramid generator**: drop sparse seed tiles on a map and Genesis
-completes the entire multi-scale quadtree (the paper's *multi-scale tile completion*).
+The main demo is the **full-pyramid generator**: drop sparse seed tiles on a map and Genesis
+completes the entire multi-scale quadtree.
 
 ```bash
 export GENESIS_CKPT_BASE=/path/to/ckpt_cache   # where Google-Drive ckpts land (rclone `gdrive` remote)
@@ -167,62 +78,16 @@ python demos/app_pyramid_unified.py            # opens a Gradio app; prints a lo
 ```
 
 Click the map to drop seeds → **Generate**; the main B/16 + H/16 checkpoints auto-pull from Google
-Drive on first use. The other apps (per-tile SR, single-tile outpainting, deep 6-level pyramid,
-no-model interpolation baselines) are documented in [`demos/README.md`](demos/README.md).
+Drive on first use. Other apps (per-tile SR, single-tile outpainting, deep 6-level pyramid,
+no-model interpolation baselines) are in [`demos/README.md`](demos/README.md).
 
----
+## Train / evaluate
 
-## Pretrained checkpoints
+- **Train** the operators → [`docs/TRAINING.md`](docs/TRAINING.md)
+- **Reproduce the paper tables** → [`docs/EVALUATION.md`](docs/EVALUATION.md)
 
-The **main** 800k-step ckpts are mirrored to a public Google Drive folder:
+Both use the same auto-downloaded checkpoints/data for the Genesis JiT-B/16 & JiT-H/16 models.
 
-<https://drive.google.com/drive/folders/1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA>
+## License
 
-```
-main/                                # 800k-step main runs, end-of-stage-3
-├── superresolution/main_{B16,H16}/sr-full-tile-stage3-step0800000.ckpt        # DINO + LPIPS=0.5
-└── outpainting/main_{B16,H16}/op-new-stage3-step0800000.ckpt                  # no DINO, no TW, quadrant curriculum
-dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth                                    # DINO encoder weights
-shared/git10m_quad_meta.json                                                   # eval metadata
-shared/hierarchy_index_quad.pkl                                                # SR parent→child lookup
-```
-
-Main is what the Gradio demos default to: SR = DINO + LPIPS(0.5), OP =
-no-DINO + no-TW (see [`src/outpainting/README.md`](src/outpainting/README.md)).
-
-The folder is shared as "Anyone with the link can view", so configuring
-any Google account with rclone works (`rclone config` → `n` (new
-remote) → `drive` → accept defaults → `n` for advanced → use the OAuth
-flow). The folder ID is passed via `--drive-root-folder-id`, so the
-remote itself does not need to be pinned to this folder.
-
-Set `GENESIS_CKPT_BASE` first (add to `~/.bashrc` to persist):
-
-```bash
-export GENESIS_CKPT_BASE=/path/to/checkpoints/project_genesis/gdrive_copy
-```
-
-Then pull with rclone (requires a Google Drive remote named `gdrive` — `type = drive`):
-
-```bash
-GDRIVE_FOLDER_ID=1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA
-
-# pull everything (~57 GB) — what the demos use
-rclone copy gdrive: "$GENESIS_CKPT_BASE" \
-  --drive-root-folder-id "$GDRIVE_FOLDER_ID" \
-  --progress --transfers 4
-
-# or just one variant
-rclone copy gdrive:main/superresolution/main_B16 \
-  "$GENESIS_CKPT_BASE/main/superresolution/main_B16" \
-  --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress
-```
-
-The Gradio demos auto-pull these on first **Generate** — manual `rclone copy`
-is only needed if you want to stage them ahead of time.
-
-**Ablations.** The SR Phase-1 ablation ckpts
-(`abl_{nodino_nolpips,dino_nolpips,nodino_lpips,dino_lpips}`) are on
-Google Drive under `ablations/` in the same release folder. OP is
-ablation-free (the locked OP config is no-DINO + no-time-weight under
-the quadrant mask curriculum), so this only affects SR.
+Released under the MIT License — see [`LICENSE`](LICENSE).

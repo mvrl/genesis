@@ -3,7 +3,7 @@ LOADING DATA
 ============================================================
 Hierarchy locations: 6,895,979
 
-Loading location_to_indices from /projects/bgtj/shared/location_to_indices.pkl...
+Loading location_to_indices from <data_root>/location_to_indices.pkl...
 Total locations in pkl: 6,895,979
 Valid locations after filtering: 6,895,978
 Locations with hierarchy + HF indices: 6,895,978
@@ -15,7 +15,7 @@ Total HF samples: 6,895,978
 Finding all complete 2×2 quads (parent + all 4 children in dataset)...
 Complete quads available (all zoom levels): 452,080
 
-Identifying urban areas using /projects/bgtj/shared/shapefiles/World_Urban_Areas.shp...
+Identifying urban areas using <data_root>/shapefiles/World_Urban_Areas.shp...
 Loaded 3,598 urban area polygons (CRS: EPSG:3857)
 Performing spatial join...
   Urban quads    : 279,645  (61.9%)
@@ -75,7 +75,7 @@ Split summary:
   random_test    :   49,826 locs      49,826 samples  (0.72%)  [10,000 complete quads]
   spatial_test   :   49,825 locs      49,825 samples  (0.72%)  [10,000 complete quads]
 
-✅ Saved hierarchy to /projects/bgtj/shared/hierarchy_index_quad.pkl
+✅ Saved hierarchy to <data_root>/hierarchy_index_quad.pkl
 
 ============================================================
 STEP 6: CREATE FULL DATASET METADATA FILE
@@ -99,7 +99,7 @@ Satellite distribution:
 GSD stats (excl. 3,607,589 samples with gsd=0):
   min=0.09  max=152.87  mean=3.75  median=0.90  m/px
 
-✅ Saved full dataset metadata to /projects/bgtj/shared/git10m_quad_meta.json
+✅ Saved full dataset metadata to <data_root>/git10m_quad_meta.json
 
 ============================================================
 STEP 7: PARENT → CHILDREN DISTRIBUTION BY ZOOM LEVEL

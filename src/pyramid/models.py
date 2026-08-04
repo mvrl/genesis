@@ -32,18 +32,15 @@ _OP_REL = {
     "JiT-H/16": ("main", "outpainting", "main_H16", "op-new-stage3-step0800000.ckpt"),
 }
 
-# Candidate checkpoint roots, in priority order. The user's shell may set
-# GENESIS_CKPT_BASE one level too high (…/gdrive_ckpts instead of
-# …/gdrive_ckpts/genesis), so we also probe a "genesis" subdir and the repo
-# mirror. The first root that actually contains the file wins.
+# Candidate checkpoint roots, in priority order. GENESIS_CKPT_BASE wins; we also
+# probe a "genesis" subdir under it (in case it was set one level too high) and the
+# repo-default mirror <repo>/logs/ckpts. The first root that contains the file wins.
 def _candidate_roots() -> list:
     roots = []
     env = (os.environ.get("GENESIS_CKPT_BASE") or "").strip()
     if env:
         roots += [env, os.path.join(env, "genesis")]
     roots += [
-        os.path.join(_REPO, "gdrive_ckpts", "genesis"),
-        os.path.join(_REPO, "gdrive_ckpts"),
         os.path.join(_REPO, "logs", "ckpts"),
     ]
     # de-dup, preserve order

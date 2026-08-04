@@ -100,7 +100,7 @@ python aggregate.py --task op --metric lpips --pivot exp --columns split,regime
 
 ```bash
 for P in A B C; do for W in 1 2 3 4 5; do
-  PYTHONPATH=../.. python -m pyramid.run_pyramid_eval \
+  PYTHONPATH=.. python -m pyramid.run_pyramid_eval \
     --protocol $P --window $W --sites 0:100 \
     --arch JiT-H/16 --steps 50 --cfg 2.5 --uni_overlap 32 --uni_t 0.40 \
     --out_root outputs/dense500_eval_h16
@@ -111,9 +111,9 @@ done; done
 **2. Score** (image quality + FID, then semantic + consistency, then caption). Run per gen root:
 
 ```bash
-PYTHONPATH=../.. python eval_pyramid.py  --gen_root outputs/dense500_eval_h16 --device cuda
-PYTHONPATH=../.. python eval_ext.py      --gen_root outputs/dense500_eval_h16 --families consistency,semantic --device cuda
-PYTHONPATH=../.. python caption_agree.py --gen_root outputs/dense500_eval_h16 --sites_per_cell 10 --device cuda
+PYTHONPATH=.. python eval_pyramid.py  --gen_root outputs/dense500_eval_h16 --device cuda
+PYTHONPATH=.. python eval_ext.py      --gen_root outputs/dense500_eval_h16 --families consistency,semantic --device cuda
+PYTHONPATH=.. python caption_agree.py --gen_root outputs/dense500_eval_h16 --sites_per_cell 10 --device cuda
 # repeat for outputs/dense500_eval_b16
 ```
 

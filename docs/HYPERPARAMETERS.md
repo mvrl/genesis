@@ -2,7 +2,7 @@
 
 A single reproducibility reference for **every training and evaluation experiment**.
 Each value is cross-checked against the **paper** (SIGSPATIAL'26) and the **code**
-(defaults in `src/…` and the `logs/eval_table*.sh` runners).
+(defaults in `src/…`; copy-paste reproduction loops in [`EVALUATION.md`](EVALUATION.md)).
 Where the paper abstracts a value (e.g. "batch size 256"), the concrete code decomposition
 is given. Numbers here are the *paper-faithful defaults* — running the referenced scripts
 with no overrides reproduces the paper.
@@ -121,8 +121,7 @@ dense500: **1,500** pyramids/arch (500 sites × 3 protocols) · ablation: **20,0
 
 ## 5. Super-resolution eval
 
-Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (per cell) /
-`logs/eval_table2_sr.sh` (full table).
+Reproduces per child-zoom group × split. **Run:** `src/eval/run_eval_sr.sh` (per cell); full-table loop in [`EVALUATION.md`](EVALUATION.md).
 
 | Setting | Value | Flag |
 |---|---|---|
@@ -147,7 +146,7 @@ count-sensitive metric, so this cap is what makes FID match the paper. **Source:
 
 ## 6. Outpainting eval
 
-**Run:** `src/eval/run_eval_op.sh` (per cell) / `logs/eval_table3_op.sh` (full table).
+**Run:** `src/eval/run_eval_op.sh` (per cell); full-table loop in [`EVALUATION.md`](EVALUATION.md).
 
 | Setting | Value | Flag |
 |---|---|---|
@@ -166,14 +165,15 @@ B-diff = mean abs pixel difference in a 4-px ring inside the hole boundary.
 
 Realized N per cell = 8192 per split × regime (see the consolidated **Evaluation sample counts**
 table, §4). As in SR, FID is the only count-sensitive metric — 8192 is what makes FID match the
-paper (full ~50k gives a lower, less-biased FID). **Source:** paper (outpainting results; 8192
-from the OP eval launcher `submit_outpainting_full.sh`).
+paper (full ~50k gives a lower, less-biased FID). **Source:** paper (outpainting results; the
+8192 cap is what the OP eval launcher used to produce the paper table). In this repo it is the
+default `MAX_SAMPLES` in `src/eval/run_eval_op.sh`.
 
 ---
 
 ## 7. SR ablation (DINOv3 × LPIPS)
 
-**Run:** `src/eval/run_eval_sr_ablation.sh` (per cell) / `logs/eval_table5_ablation.sh` (all 4).
+**Run:** `src/eval/run_eval_sr_ablation.sh` (per cell); all four cells in [`EVALUATION.md`](EVALUATION.md).
 
 | Setting | Value | Flag |
 |---|---|---|
@@ -195,7 +195,7 @@ trained to **500k** (not 800k). **Source:** paper (SR ablation).
 
 Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (🤗 `dcher95/dense500`).
 **Run:** `python -m pyramid.run_pyramid_eval` (generate) → `eval_pyramid.py` / `eval_ext.py` /
-`caption_agree.py` (score) / `logs/eval_table4_dense500.sh` (all).
+`caption_agree.py` (score); full loop in [`EVALUATION.md`](EVALUATION.md).
 
 ### 8.1 Seed protocols
 | Protocol | Seeds | Tests |
@@ -204,7 +204,11 @@ Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (
 | B | 3 independent seeds, one per non-root level | multi-scale reconciliation |
 | C (easiest) | 4 spatially independent (2 leaf + 1 D-1 + 1 D-2) | dense leaf anchors under coarse guidance |
 
-### 8.2 Generation config (campaign `worker.sh`)
+### 8.2 Generation config (dense500 pyramid campaign)
+
+These are the paper's dense500 generation settings; in this repo they are the defaults of
+`src/pyramid/run_pyramid_eval.py` (driven by `src/eval/run_all_dense500.sh`).
+
 | Setting | Value | Flag |
 |---|---|---|
 | Checkpoints | SR + OP main, 800k | `--arch JiT-{B,H}/16` |
@@ -257,11 +261,13 @@ Auto-pulled to `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`) via an rclone 
 
 ## 11. Quick reproduction map
 
+Copy-paste commands for every table: [`EVALUATION.md`](EVALUATION.md).
+
 | Experiment | What | Script (defaults reproduce it) |
 |---|---|---|
-| Super-resolution | PSNR/SSIM/LPIPS/DISTS/FID | `logs/eval_table2_sr.sh` → `src/eval/run_eval_sr.sh` |
-| Outpainting | LPIPS/DISTS/B-diff/FID | `logs/eval_table3_op.sh` → `src/eval/run_eval_op.sh` |
-| dense500 pyramid | image quality + semantic + consistency | `logs/eval_table4_dense500.sh` → `pyramid.run_pyramid_eval` + `eval_{pyramid,ext}.py` + `caption_agree.py` |
-| SR ablation | DINOv3 × LPIPS | `logs/eval_table5_ablation.sh` → `src/eval/run_eval_sr_ablation.sh` |
+| Super-resolution | PSNR/SSIM/LPIPS/DISTS/FID | `src/eval/run_eval_sr.sh` (per zoom-group) |
+| Outpainting | LPIPS/DISTS/B-diff/FID | `src/eval/run_eval_op.sh` (per regime) |
+| dense500 pyramid | image quality + semantic + consistency | `pyramid.run_pyramid_eval` + `eval_{pyramid,ext}.py` + `caption_agree.py` |
+| SR ablation | DINOv3 × LPIPS | `src/eval/run_eval_sr_ablation.sh` |
 | Mean FID | mean over SR + OP cells | emitted by the SR & OP runs |
 | Training | hyperparameters | `src/superresolution/run_sr.sh`, `src/outpainting/run_op.sh` |

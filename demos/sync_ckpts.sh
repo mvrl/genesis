@@ -2,7 +2,7 @@
 # sync_ckpts.sh — download Genesis checkpoints from Google Drive to GENESIS_CKPT_BASE
 #
 # Usage:
-#   export GENESIS_CKPT_BASE=/storage1/fs1/jacobsn/Active/user_k.subash/checkpoints/project_genesis/gdrive_copy
+#   export GENESIS_CKPT_BASE=/path/to/ckpt_cache   # where the Google-Drive checkpoints land
 #   bash demos/sync_ckpts.sh
 #
 # Requirements: rclone configured with a Google Drive remote (type = drive)
