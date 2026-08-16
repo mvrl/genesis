@@ -45,91 +45,72 @@ _SRC       = os.path.abspath(os.path.join(_REPO_ROOT, "src"))
 _DEFAULT_CKPT_BASE = os.path.join(_REPO_ROOT, "logs", "ckpts")
 _CKPT_BASE = (os.environ.get("GENESIS_CKPT_BASE") or "").strip() or _DEFAULT_CKPT_BASE
 
-# Public release folder on Google Drive — main ckpts + DINOv3 + shared/.
-# "Anyone with the link can view", so any authenticated Google account
-# with a configured rclone `gdrive:` remote can pull from it.
-GDRIVE_REMOTE = (os.environ.get("GENESIS_GDRIVE_REMOTE") or "gdrive").strip() or "gdrive"
-GDRIVE_FOLDER_ID = (
-    (os.environ.get("GENESIS_GDRIVE_FOLDER_ID") or "").strip()
-    or "1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA"
-)
-GDRIVE_FOLDER_URL = f"https://drive.google.com/drive/folders/{GDRIVE_FOLDER_ID}"
+# Public release repo on the Hugging Face Hub — main ckpts + DINOv3 + shared/.
+# Public repo, so downloads need no authentication or extra tooling.
+HF_REPO_ID = (os.environ.get("GENESIS_HF_REPO") or "").strip() or "MVRL/genesis"
+HF_REPO_URL = f"https://huggingface.co/{HF_REPO_ID}"
 
 
-def _gdrive_pull_if_missing(local_path: str, gdrive_path: str, label: str = "checkpoint") -> str:
-    """rclone copy `gdrive_path` → `local_path` if the local file is missing.
+def _hf_pull_if_missing(local_path: str, hf_rel: str, label: str = "checkpoint") -> str:
+    """Download `hf_rel` from the HF release repo → `local_path` if missing.
 
-    `gdrive_path` is of the form ``gdrive:<rel>``; the remote is anchored at
-    the release folder via ``--drive-root-folder-id``.
+    The local layout under `_CKPT_BASE` mirrors the HF repo, so files land at
+    their expected paths directly (no separate cache copy).
     """
     if os.path.isfile(local_path):
         return local_path
-    if not shutil.which("rclone"):
+    from huggingface_hub import hf_hub_download
+
+    print(f"[eval] {label} not found locally — downloading {hf_rel} from {HF_REPO_URL}", flush=True)
+    try:
+        got = hf_hub_download(repo_id=HF_REPO_ID, filename=hf_rel, local_dir=_CKPT_BASE)
+    except Exception as e:
         raise FileNotFoundError(
-            f"{label} missing locally and `rclone` not on PATH:\n"
+            f"{label} download failed ({type(e).__name__}).\n"
             f"  expected: {local_path}\n"
-            f"  source:   {gdrive_path}\n"
-            f"  release:  {GDRIVE_FOLDER_URL}\n"
-            f"Install rclone (https://rclone.org/) and configure a Google Drive remote named `{GDRIVE_REMOTE}:`."
-        )
-    dst_dir = os.path.dirname(local_path) or "."
-    os.makedirs(dst_dir, exist_ok=True)
-    print(f"[eval] {label} not found locally — pulling from {gdrive_path}", flush=True)
-    rc = subprocess.run(
-        [
-            "rclone", "copy", gdrive_path, dst_dir,
-            "--drive-root-folder-id", GDRIVE_FOLDER_ID,
-            "--progress",
-        ],
-        check=False,
-    )
-    if rc.returncode != 0 or not os.path.isfile(local_path):
-        raise FileNotFoundError(
-            f"{label} download failed (rclone exit {rc.returncode}).\n"
-            f"  expected: {local_path}\n"
-            f"  source:   {gdrive_path}\n"
-            f"  release:  {GDRIVE_FOLDER_URL}\n"
-            f"Verify the `{GDRIVE_REMOTE}:` rclone remote and that the source exists."
-        )
+            f"  source:   {HF_REPO_URL}/blob/main/{hf_rel}\n"
+            f"Check network access and that the file exists in the release repo, "
+            f"or pre-download everything with src/eval/download_ckpts.sh."
+        ) from e
+    if os.path.abspath(got) != os.path.abspath(local_path):
+        # Rare: caller expects the file outside `_CKPT_BASE` (custom override).
+        os.makedirs(os.path.dirname(local_path) or ".", exist_ok=True)
+        shutil.move(got, local_path)
     return local_path
 
 
-def _gdrive_path_for(local_path: str) -> str:
-    """Map a local path under `_CKPT_BASE` → its Google Drive source.
+def _hf_rel_for(local_path: str) -> str:
+    """Map a local path under `_CKPT_BASE` → its repo-relative path on the Hub.
     Falls back to basename when the path isn't under `_CKPT_BASE`."""
     try:
         rel = os.path.relpath(local_path, _CKPT_BASE)
         if rel.startswith(".."):
             raise ValueError
-        return f"{GDRIVE_REMOTE}:{rel.replace(os.sep, '/')}"
+        return rel.replace(os.sep, "/")
     except ValueError:
-        return f"{GDRIVE_REMOTE}:{os.path.basename(local_path)}"
+        return os.path.basename(local_path)
 
 
 # ── Default meta-file paths + auto-pull helper ───────────────────────────────
-# The Google Drive release folder publishes the eval metadata under shared/.
-# `resolve_meta_path` lets a CLI argument default to the gdrive layout while
+# The HF release repo publishes the eval metadata under shared/.
+# `resolve_meta_path` lets a CLI argument default to the release layout while
 # still respecting an explicit override (e.g. a lab-local path).
 
 DEFAULT_META_FILE  = os.path.join(_CKPT_BASE, "shared", "git10m_quad_meta.json")
 DEFAULT_HINDEX_PKL = os.path.join(_CKPT_BASE, "shared", "hierarchy_index_quad.pkl")
 
 
-def resolve_meta_path(local_path: str, gdrive_rel: str, label: str) -> str:
-    """Return `local_path`, auto-pulling from `gdrive:<gdrive_rel>` if missing.
+def resolve_meta_path(local_path: str, hf_rel: str, label: str) -> str:
+    """Return `local_path`, auto-downloading `hf_rel` from the Hub if missing.
 
-    Unlike `_gdrive_path_for`, the gdrive-side relative path is supplied
-    explicitly because meta files may live outside `_CKPT_BASE` (e.g. a
-    lab-shared directory). Existing local files are returned as-is —
-    download only happens when the file isn't already cached.
+    Unlike `_hf_rel_for`, the repo-relative path is supplied explicitly
+    because meta files may live outside `_CKPT_BASE` (e.g. a lab-shared
+    directory). Existing local files are returned as-is — download only
+    happens when the file isn't already cached.
     """
     if os.path.isfile(local_path):
         return local_path
-    return _gdrive_pull_if_missing(
-        local_path,
-        f"{GDRIVE_REMOTE}:{gdrive_rel}",
-        label=label,
-    )
+    return _hf_pull_if_missing(local_path, hf_rel, label=label)
 
 
 # ── Experiment registry / ckpt resolution ────────────────────────────────────
@@ -188,32 +169,32 @@ def _ckpt_path_for_exp(task: str, exp: str, stage: int) -> str:
 
 
 def resolve_ckpt(task: str, ckpt: Optional[str], exp: Optional[str], stage: Optional[int]) -> str:
-    """Return a local ckpt path; auto-pulls from Google Drive if missing.
+    """Return a local ckpt path; auto-downloads from the HF Hub if missing.
 
     Both main (`--exp main_b16 / main_h16`) and SR ablation (`--exp abl_*`)
-    checkpoints are published in the Google Drive release and auto-pull the
+    checkpoints are published in the HF release repo and auto-download the
     same way.
     """
     if ckpt:
         if os.path.isfile(ckpt):
             return os.path.abspath(ckpt)
         if ckpt.startswith(_CKPT_BASE):
-            return _gdrive_pull_if_missing(ckpt, _gdrive_path_for(ckpt), label=f"{task} checkpoint")
+            return _hf_pull_if_missing(ckpt, _hf_rel_for(ckpt), label=f"{task} checkpoint")
         raise FileNotFoundError(f"--ckpt does not exist: {ckpt}")
     if exp is None or stage is None:
         raise ValueError("Must pass either --ckpt or both --exp and --stage.")
     local = _ckpt_path_for_exp(task, exp, stage)
-    return _gdrive_pull_if_missing(local, _gdrive_path_for(local), label=f"{task} checkpoint")
+    return _hf_pull_if_missing(local, _hf_rel_for(local), label=f"{task} checkpoint")
 
 
-# DINOv3 weights — same auto-pull as demos. Google Drive source is
-# `gdrive:<fname>` (anchored at the release folder id).
+# DINOv3 weights — same auto-download as demos; lives at the root of the
+# HF release repo.
 _DINO_FNAME = "dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth"
 DEFAULT_DINO_WEIGHTS = os.path.join(_CKPT_BASE, _DINO_FNAME)
 
 
 def resolve_dino_weights(arg: Optional[str]) -> str:
-    """Resolve DINOv3 weights path; auto-pulls from Google Drive if not local."""
+    """Resolve DINOv3 weights path; auto-downloads from the HF Hub if not local."""
     p = (arg or "").strip()
     if not p:
         p = (os.environ.get("GENESIS_DINO_WEIGHTS") or "").strip()
@@ -221,11 +202,7 @@ def resolve_dino_weights(arg: Optional[str]) -> str:
         if not os.path.isfile(p):
             raise FileNotFoundError(f"DINO weights path not found: {p}")
         return p
-    return _gdrive_pull_if_missing(
-        DEFAULT_DINO_WEIGHTS,
-        f"{GDRIVE_REMOTE}:{_DINO_FNAME}",
-        label="DINOv3 weights",
-    )
+    return _hf_pull_if_missing(DEFAULT_DINO_WEIGHTS, _DINO_FNAME, label="DINOv3 weights")
 
 
 # ── Model loaders ────────────────────────────────────────────────────────────

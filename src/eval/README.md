@@ -21,8 +21,8 @@ Reproduces the **Genesis (JiT-B/16 and JiT-H/16) numbers** in the paper:
 uv sync && source .venv/bin/activate      # from the repo root (installs pinned deps)
 ```
 
-- **Checkpoints** auto-download on first use from the public Google Drive release
-  (folder `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`) via an rclone `gdrive:` remote into
+- **Checkpoints** auto-download on first use from the public Hugging Face model repo
+  [`MVRL/genesis`](https://huggingface.co/MVRL/genesis) via `huggingface_hub` (no auth) into
   `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts/`). `--exp main_b16 | main_h16` and the
   `abl_*` ablation cells all resolve automatically. DINOv3-sat weights resolve the same way
   (or set `$GENESIS_DINO_WEIGHTS`).

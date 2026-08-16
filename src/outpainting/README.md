@@ -141,6 +141,5 @@ Extra `main.py` flags forwarded after `./run_op.sh`:
 
 **Data prep** — shared with SR (`src/dataprep/build_quad_splits_hf.py`).
 `git10m_quad_meta.json` carries seeded-shuffled, ZL-balanced `splits` lists
-keyed by HF index. Mirrored in the Google Drive release folder under
-`shared/`:
-<https://drive.google.com/drive/folders/1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA>
+keyed by HF index. Mirrored in the Hugging Face release under `shared/`:
+<https://huggingface.co/MVRL/genesis>

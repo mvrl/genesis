@@ -101,8 +101,12 @@ class EmbedScorer:
             return ("clip", m.visual.to(self.device).eval(), pp, m.to(self.device).eval())
         if e == "dinov3sat":
             import torchvision.transforms as T
-            w = os.environ.get("GENESIS_DINO_WEIGHTS",
-                               "")
+            w = (os.environ.get("GENESIS_DINO_WEIGHTS") or "").strip()
+            if not w:
+                # Auto-resolve (and download from the HF release if missing) — same
+                # path the SR eval uses, so a bare `run_all_dense500.sh` works.
+                from common import resolve_dino_weights
+                w = resolve_dino_weights(None)
             model = torch.hub.load("facebookresearch/dinov3", "dinov3_vitl16", weights=w)
             model = model.to(self.device).eval()
             pp = T.Compose([T.Resize(256), T.CenterCrop(224), T.ToTensor(),

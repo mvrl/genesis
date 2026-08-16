@@ -40,20 +40,20 @@ PYTHONPATH=src python -m pyramid.verify_data
 
 ## Checkpoints
 
-Checkpoints resolve **local-first, with Google Drive auto-pull as fallback**.
+Checkpoints resolve **local-first, with Hugging Face auto-download as fallback**.
 The wrapper probes `$GENESIS_CKPT_BASE` (and `logs/ckpts`); if a checkpoint (or
-the DINOv3 weights) is missing it is fetched from the release folder via
-`rclone` into `logs/ckpts/` and reused. DINOv3 weights use `$GENESIS_DINO_WEIGHTS`
-if set, else auto-pull. See [`../../demos/README.md`](../../demos/README.md) for
-the full checkpoint table and env vars.
+the DINOv3 weights) is missing it is fetched from the public model repo
+[`MVRL/genesis`](https://huggingface.co/MVRL/genesis) via `huggingface_hub`
+into `logs/ckpts/` and reused — no authentication needed. DINOv3 weights use
+`$GENESIS_DINO_WEIGHTS` if set, else auto-download. See
+[`../../demos/README.md`](../../demos/README.md) for the full checkpoint table
+and env vars.
 
 Set `GENESIS_CKPT_BASE` before running (add to `~/.bashrc` to persist):
 
 ```bash
-export GENESIS_CKPT_BASE=/path/to/checkpoints/project_genesis/gdrive_copy
+export GENESIS_CKPT_BASE=/path/to/checkpoints/project_genesis/ckpt_cache
 ```
-
-Auto-pull requires an rclone Google Drive remote named `gdrive` (`type = drive`).
 
 ## Adding a strategy
 

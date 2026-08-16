@@ -72,6 +72,17 @@ def main(args):
     args.zoom_diffs = [1]
     args.zoom_diff = 1
 
+    # DINO conditioning is on by default; if no weights path was given, auto-download
+    # the DINOv3-sat encoder from the HF release into $GENESIS_CKPT_BASE.
+    if args.use_dino and not (args.dino_weights or "").strip():
+        from huggingface_hub import hf_hub_download
+        repo = (os.environ.get("GENESIS_HF_REPO") or "").strip() or "MVRL/genesis"
+        base = (os.environ.get("GENESIS_CKPT_BASE") or "").strip() or os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), "..", "..", "logs", "ckpts")
+        args.dino_weights = hf_hub_download(
+            repo, "dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth", local_dir=base)
+        print(f"[train-sr] DINOv3 weights resolved -> {args.dino_weights}", flush=True)
+
     # Parse devices
     if "," in str(args.devices):
         devices = [int(x) for x in str(args.devices).split(",")]

@@ -9,8 +9,9 @@ EMA, curriculum boundaries, precision, …) is in [`HYPERPARAMETERS.md`](HYPERPA
 uv sync && source .venv/bin/activate
 ```
 Training reads Git-10M (🤗 `lcybuaa/Git-10M`) plus the quad-split metadata + hierarchy index from
-the Google Drive release — all auto-downloaded on first use (see the top-level `README.md` for the
-rclone `gdrive` remote). DINOv3-sat weights (SR) auto-pull the same way.
+the Hugging Face release (🤗 [`MVRL/genesis`](https://huggingface.co/MVRL/genesis)) — all
+auto-downloaded on first use, no authentication needed. DINOv3-sat weights (SR) auto-download the
+same way.
 
 > **Global batch = 256** in the paper = `batch_size 32 × accumulate_grad_batches 4 × devices 2`.
 > On a single GPU that is 128 — pass `--accumulate_grad_batches 8` to keep 256.

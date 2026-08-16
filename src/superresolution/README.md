@@ -161,5 +161,5 @@ Extra `main.py` flags forwarded after `./run_sr.sh`:
 **Data prep** (one-time, `src/dataprep/build_quad_splits_hf.py`):
 `git10m_quad_meta.json` (per-tile metadata + seeded-shuffled, ZL-balanced
 `splits`) and `hierarchy_index_quad.pkl` (parent→child lookup).
-Both mirrored in the Google Drive release folder under `shared/`:
-<https://drive.google.com/drive/folders/1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA>
+Both mirrored in the Hugging Face release under `shared/`:
+<https://huggingface.co/MVRL/genesis>

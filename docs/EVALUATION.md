@@ -14,25 +14,22 @@ and [`METRICS_DENSE500.md`](METRICS_DENSE500.md) (pyramid).
 uv sync && source .venv/bin/activate        # from the repo root; installs pinned deps (torch cu128)
 ```
 
-## 2. Download checkpoints (Google Drive)
-Checkpoints, the DINOv3-sat encoder, and the split metadata live in a public Google Drive release
-(folder `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`). Set up an rclone remote named `gdrive` once:
-```bash
-rclone config          # n(ew) -> name: gdrive -> storage: drive -> accept defaults -> OAuth in browser
-```
-Then pre-download everything (main + ablation ckpts, DINOv3, split meta) into `$GENESIS_CKPT_BASE`
-(default `<repo>/logs/ckpts`):
+## 2. Download checkpoints (Hugging Face)
+Checkpoints, the DINOv3-sat encoder, and the split metadata live in the public Hugging Face model
+repo [`MVRL/genesis`](https://huggingface.co/MVRL/genesis) — no authentication or setup needed.
+To pre-download everything (main + ablation ckpts, DINOv3, split meta; ~70 GB) into
+`$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`):
 ```bash
 bash src/eval/download_ckpts.sh                    # or: GENESIS_CKPT_BASE=/my/cache bash src/eval/download_ckpts.sh
 ```
-> Pre-downloading is optional — the eval scripts auto-pull each file on first use — but it avoids
+> Pre-downloading is optional — the eval scripts auto-download each file on first use — but it avoids
 > parallel jobs racing on the same download. If you cache to a custom path, `export
 > GENESIS_CKPT_BASE=/that/path` before step 4. The **Git-10M** and **dense500** datasets download
 > automatically from the Hugging Face Hub (no manual step).
 
 ## 3. (optional) point at custom cache locations
 ```bash
-export GENESIS_CKPT_BASE=/path/to/ckpt_cache       # where the Drive files live (default <repo>/logs/ckpts)
+export GENESIS_CKPT_BASE=/path/to/ckpt_cache       # where the downloaded files live (default <repo>/logs/ckpts)
 export HF_DATASETS_CACHE=/path/to/hf_cache         # optional; else HF default cache
 ```
 

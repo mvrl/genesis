@@ -4,8 +4,8 @@ Reuses `demos/utils/genesis_common.py` for checkpoint loading (EMA) and the SR/O
 `generate` calls, with true-zoom conditioning (the actual tile zoom feeds the
 model's zoom embedder). Checkpoints resolve from local disk first (set
 GENESIS_CKPT_BASE / GENESIS_DINO_WEIGHTS *before* importing genesis_common, whose
-path constants are computed at import), else auto-pull from the Google Drive
-release folder via rclone.
+path constants are computed at import), else auto-download from the Hugging Face
+release repo (MVRL/genesis).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ _REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 TILE_PX = 256
 
-# Per-arch relative checkpoint paths under a checkpoint root (gdrive layout).
+# Per-arch relative checkpoint paths under a checkpoint root (HF-repo layout).
 _SR_REL = {
     "JiT-B/16": ("main", "superresolution", "main_B16", "sr-full-tile-stage3-step0800000.ckpt"),
     "JiT-H/16": ("main", "superresolution", "main_H16", "sr-full-tile-stage3-step0800000.ckpt"),
@@ -57,21 +57,20 @@ def _resolve_ckpt(rel: tuple, arch: str, task: str) -> str:
         p = os.path.join(root, *rel)
         if os.path.isfile(p):
             return p
-    # 2) Not on disk anywhere → auto-pull from the Google Drive release folder.
-    #    `rel` already mirrors the gdrive layout (e.g. main/superresolution/...),
-    #    so the rclone source is just gdrive:<rel> (anchored at the release folder
-    #    id by genesis_common). Download into genesis_common's _CKPT_BASE so the
-    #    local mirror matches the gdrive tree and later runs hit the fast path.
+    # 2) Not on disk anywhere → auto-download from the HF release repo.
+    #    `rel` already mirrors the repo layout (e.g. main/superresolution/...),
+    #    so the Hub path is just "/".join(rel). Download into genesis_common's
+    #    _CKPT_BASE so the local mirror matches the repo tree and later runs
+    #    hit the fast path.
     target = os.path.join(gc._CKPT_BASE, *rel)
-    gdrive_src = f"{gc.GDRIVE_REMOTE}:" + "/".join(rel)
     try:
-        return gc._gdrive_pull_if_missing(target, gdrive_src,
-                                          label=f"{task} checkpoint ({arch})")
+        return gc._hf_pull_if_missing(target, "/".join(rel),
+                                      label=f"{task} checkpoint ({arch})")
     except FileNotFoundError as e:
         tried = "\n  ".join(os.path.join(r, *rel) for r in _candidate_roots())
         raise FileNotFoundError(
-            f"{task} checkpoint for {arch} not found locally and the Google Drive "
-            f"auto-pull failed.\nProbed local roots:\n  {tried}\n\n{e}") from e
+            f"{task} checkpoint for {arch} not found locally and the Hugging Face "
+            f"auto-download failed.\nProbed local roots:\n  {tried}\n\n{e}") from e
 
 
 # Pin GENESIS_CKPT_BASE to the resolved local mirror so genesis_common's own
@@ -81,7 +80,7 @@ for _r in _candidate_roots():
         os.environ["GENESIS_CKPT_BASE"] = _r
         break
 
-# DINOv3 satellite weights used by SR (avoid the rclone auto-pull).
+# DINOv3 satellite weights used by SR (skip the auto-download when staged).
 _DINO_DEFAULT = os.environ.get("GENESIS_DINO_WEIGHTS", "")
 if not (os.environ.get("GENESIS_DINO_WEIGHTS") or "").strip() and os.path.isfile(_DINO_DEFAULT):
     os.environ["GENESIS_DINO_WEIGHTS"] = _DINO_DEFAULT

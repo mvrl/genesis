@@ -245,7 +245,7 @@ Paper: SR Genesis-H 12.64 / Genesis-B 14.43; OP Genesis-H 9.12. **Source:** pape
 
 ---
 
-## 10. Checkpoints (Google Drive release `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`)
+## 10. Checkpoints (Hugging Face release [`MVRL/genesis`](https://huggingface.co/MVRL/genesis))
 
 | Experiment | Path under release | Steps |
 |---|---|---|
@@ -255,7 +255,7 @@ Paper: SR Genesis-H 12.64 / Genesis-B 14.43; OP Genesis-H 9.12. **Source:** pape
 | DINOv3-sat weights | `dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth` | — |
 | Eval metadata | `shared/git10m_quad_meta.json`, `shared/hierarchy_index_quad.pkl` | — |
 
-Auto-pulled to `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`) via an rclone `gdrive:` remote.
+Auto-downloaded to `$GENESIS_CKPT_BASE` (default `<repo>/logs/ckpts`) via `huggingface_hub` — no authentication needed.
 
 ---
 

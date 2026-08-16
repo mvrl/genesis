@@ -30,12 +30,11 @@ The pyramid strategy is described as paper-ready pseudocode in
 
 ```bash
 source .venv/bin/activate          # from repo root, after: uv sync
-rclone listremotes                 # must show "gdrive:" — see https://rclone.org/drive/
 ```
 
-That's it. The demos auto-fetch missing files from the public Google
-Drive release folder
-(<https://drive.google.com/drive/folders/1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA>)
+That's it. The demos auto-fetch missing files from the public Hugging
+Face model repo
+(<https://huggingface.co/MVRL/genesis>) — no authentication or setup —
 on the first **Generate** click and cache them under `<repo>/logs/ckpts/`
 (git-ignored). Defaults are the **main 800k-step runs** — SR uses
 DINO + LPIPS (weight=0.5); OP is locked at no-DINO + no-time-weight
@@ -43,24 +42,24 @@ under the quadrant mask curriculum (`quad3` → `quad2_{adj,diag}` →
 `quad1` → uniform mix). Both B16 and H16 are available as dropdown
 options:
 
-| File | Google Drive source (relative to folder ID `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA`) |
-|------|---------------------------------------------------------------------------------|
+| File | Hugging Face source (path in [`MVRL/genesis`](https://huggingface.co/MVRL/genesis)) |
+|------|--------------------------------------------------------------------------------------|
 | SR B16 | `main/superresolution/main_B16/sr-full-tile-stage3-step0800000.ckpt` |
 | SR H16 | `main/superresolution/main_H16/sr-full-tile-stage3-step0800000.ckpt` |
 | OP B16 | `main/outpainting/main_B16/op-new-stage3-step0800000.ckpt` |
 | OP H16 | `main/outpainting/main_H16/op-new-stage3-step0800000.ckpt` |
 | DINOv3 | `dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth` |
 
-To stage manually (offline use, etc.):
+To stage everything upfront (offline use, etc.):
 
 ```bash
-GDRIVE_FOLDER_ID=1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA
-rclone copy gdrive:main          logs/ckpts/main --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress --transfers 4
-rclone copy gdrive:dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth \
-                                  logs/ckpts/      --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress
+bash demos/sync_ckpts.sh           # main ckpts + DINOv3 weights → $GENESIS_CKPT_BASE
 ```
 
-Full Google Drive layout in the root [`README.md`](../README.md) (see *Data & weights*).
+Full Hugging Face layout in the root [`README.md`](../README.md) (see *Data & weights*).
+For a standalone one-file inference example (no repo checkout), see
+[`example_sr_op.py`](https://huggingface.co/MVRL/genesis/blob/main/example_sr_op.py) on
+the model card.
 
 ---
 
@@ -110,20 +109,19 @@ because the cascade is out-of-distribution.
 Before running any demo, set `GENESIS_CKPT_BASE` in your shell:
 
 ```bash
-export GENESIS_CKPT_BASE=/path/to/checkpoints/project_genesis/gdrive_copy
+export GENESIS_CKPT_BASE=/path/to/checkpoints/project_genesis/ckpt_cache
 # Add to ~/.bashrc to persist across sessions
 ```
 
-Checkpoints are auto-pulled from Google Drive on first **Generate**. To pull
-everything upfront, run `bash demos/sync_ckpts.sh` (requires a `gdrive` rclone
-remote of type `drive` — see [rclone setup](https://rclone.org/drive/)).
+Checkpoints are auto-downloaded from Hugging Face on first **Generate** — no
+authentication needed. To pull everything upfront, run
+`bash demos/sync_ckpts.sh`.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `GENESIS_CKPT_BASE` | `<repo>/logs/ckpts` | Where auto-pulled ckpts live (mirrors the Google Drive folder layout) |
-| `GENESIS_GDRIVE_FOLDER_ID` | `1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA` | Override the release folder (passed to rclone via `--drive-root-folder-id`) |
-| `GENESIS_GDRIVE_REMOTE` | `gdrive` | rclone remote name to pull from |
-| `GENESIS_DINO_WEIGHTS` | `$GENESIS_CKPT_BASE/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth` | Skip the auto-pull and use a pre-existing DINO weights file |
+| `GENESIS_CKPT_BASE` | `<repo>/logs/ckpts` | Where auto-downloaded ckpts live (mirrors the Hugging Face repo layout) |
+| `GENESIS_HF_REPO` | `MVRL/genesis` | Override the Hugging Face model repo to pull from |
+| `GENESIS_DINO_WEIGHTS` | `$GENESIS_CKPT_BASE/dinov3_vitl16_pretrain_sat493m-eadcf0ff.pth` | Skip the auto-download and use a pre-existing DINO weights file |
 | `GENESIS_DEVICE` | auto | `cuda` or `cpu` |
 | `GENESIS_CKPT_WEIGHTS` | `ema` | `online` to skip EMA-into-live copy |
 | `GENESIS_SR_B16_CKPT` / `GENESIS_OP_B16_CKPT` (and `_H16_`) | _(none)_ | Point a dropdown entry at an arbitrary path |
@@ -140,11 +138,11 @@ path" textbox.
 
 ## Notes
 
-- **Auto-download**: missing files trigger
-  `rclone copy gdrive:<path> ... --drive-root-folder-id <id>` on first
-  **Generate**. If rclone isn't on PATH or the Google Drive source doesn't
-  exist, the app fails with a clear `FileNotFoundError` listing both the
-  expected local path and the Google Drive source.
+- **Auto-download**: missing files are fetched via `huggingface_hub` from
+  [`MVRL/genesis`](https://huggingface.co/MVRL/genesis) on first
+  **Generate**. If the Hugging Face source doesn't exist, the app fails with
+  a clear `FileNotFoundError` listing both the expected local path and the
+  Hugging Face source.
 - `torch.hub` also fetches the DINOv3 *Python code* (not the .pth weights) on
   first launch; `lpips`/`DISTS_pytorch` fetch their AlexNet/VGG weights
   (~6 MB) on first metric eval.

@@ -136,18 +136,16 @@ python build_quad_splits_hf.py
 # outputs saved under data/ (override with $GENESIS_GIT10M_META / $GENESIS_HINDEX)
 ```
 
-Rather than rebuild, you can download the prebuilt files from the public Google
-Drive release folder under `shared/`. Training/eval look for them under
-`$GENESIS_CKPT_BASE/shared/` (and eval auto-pulls them there on first use), so
-mirror that layout:
+Rather than rebuild, you can download the prebuilt files from the public
+Hugging Face model repo [`MVRL/genesis`](https://huggingface.co/MVRL/genesis)
+under `shared/` (no authentication needed). Training/eval look for them under
+`$GENESIS_CKPT_BASE/shared/` (and eval auto-downloads them there on first use),
+so mirror that layout:
 
 ```bash
-GDRIVE_FOLDER_ID=1OKe2YRJFkwwFD3GWXVJMEr6qKGJz0qyA
-DEST="${GENESIS_CKPT_BASE:-logs/ckpts}/shared"
-rclone copy gdrive:shared/git10m_quad_meta.json    "$DEST/" \
-    --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress
-rclone copy gdrive:shared/hierarchy_index_quad.pkl "$DEST/" \
-    --drive-root-folder-id "$GDRIVE_FOLDER_ID" --progress
+DEST="${GENESIS_CKPT_BASE:-logs/ckpts}"
+hf download MVRL/genesis shared/git10m_quad_meta.json shared/hierarchy_index_quad.pkl \
+    --local-dir "$DEST"
 ```
 
 ---
