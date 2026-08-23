@@ -360,8 +360,10 @@ def _fill_grid_op(grid: GridState, denoiser, steps: int, cfg: float
     result as one-at-a-time, far fewer sampler invocations. Yields per committed
     window so the UI streams as the grid fills.
     """
-    denoiser.args.num_sampling_steps = int(steps)
-    denoiser.args.cfg = float(cfg)
+    # Engine reads self.steps / self.cfg_scale (snapshotted at __init__) — set
+    # the attributes; mutating args.* after load has no effect.
+    denoiser.steps = int(steps)
+    denoiser.cfg_scale = float(cfg)
     tile_zoom = grid.zoom   # a 2×2 quadrant window reassembles one zoom-Z tile
 
     n_windows = 0   # windows filled (compute-fair)

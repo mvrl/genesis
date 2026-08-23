@@ -354,10 +354,12 @@ def generate_sr(pick: dict | None, model_key: str, ckpt_override: str,
     parent = fetch_tile_at_zoom(pick["lon"], pick["lat"], pick["zp"], 256)
     zp, xp, yp = pick["zp"], pick["xp"], pick["yp"]
 
-    denoiser.args.num_sampling_steps = int(steps)
-    denoiser.args.cfg = float(cfg)
-    denoiser.args.bicubic_init = bool(bicubic_init)
-    denoiser.args.bicubic_init_t_start = float(bicubic_t_start)
+    # The engine snapshots steps/cfg at __init__ (self.steps / self.cfg_scale),
+    # so set the attributes — mutating args.* after load has no effect.
+    denoiser.steps = int(steps)
+    denoiser.cfg_scale = float(cfg)
+    denoiser.args.bicubic_init = bool(bicubic_init)                  # read live
+    denoiser.args.bicubic_init_t_start = float(bicubic_t_start)      # read live
 
     try:
         sr_out = run_superresolution(denoiser, parent, _DEVICE, target_zoom=zp + 1)

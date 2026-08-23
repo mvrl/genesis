@@ -124,15 +124,10 @@ def _get_bundle(arch: str, steps: int, cfg: float) -> ModelBundle:
     if b is None:
         b = ModelBundle(arch=arch, steps=steps, cfg=cfg)
         _BUNDLE_CACHE[arch] = b
-    # Refresh sampler knobs (unified SR reads bundle.steps/bundle.cfg per call;
-    # OP reads op.args, so push onto loaded models too).
+    # Refresh sampler knobs. The unified SR samplers read bundle.steps / bundle.cfg
+    # per call; the OP engine intentionally stays at its load-time defaults
+    # (steps=50, cfg=1.0) — the configuration the paper's dense500 results ran with.
     b.steps, b.cfg = steps, cfg
-    if b._sr is not None:
-        b._sr.args.num_sampling_steps = steps
-        b._sr.args.cfg = cfg
-    if b._op is not None:
-        b._op.args.num_sampling_steps = steps
-        b._op.args.cfg = cfg
     return b
 
 

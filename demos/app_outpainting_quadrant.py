@@ -400,8 +400,10 @@ def generate_op(
 
     mask = build_quadrant_mask_pil(known, size=256)
 
-    denoiser.args.num_sampling_steps = int(steps)
-    denoiser.args.cfg = float(cfg)
+    # Engine reads self.steps / self.cfg_scale (snapshotted at __init__) — set
+    # the attributes; mutating args.* after load has no effect.
+    denoiser.steps = int(steps)
+    denoiser.cfg_scale = float(cfg)
 
     try:
         out = run_outpainting(denoiser, tile.convert("RGB"), mask, _DEVICE, tile_zoom=pick.get("z"))

@@ -342,19 +342,23 @@ def load_denoiser_weights_from_ckpt(module: torch.nn.Module, ck: dict, label: st
     ema_list = ck.get("ema_params1")
     trainable = [p for p in module.parameters() if p.requires_grad]
     if ema_list is not None and len(ema_list) == len(trainable):
-        ok = True
-        with torch.no_grad():
-            for p, t in zip(trainable, ema_list):
-                try:
-                    te = t.detach().to(dtype=p.dtype, device=p.device)
-                except Exception:
-                    ok = False
-                    break
-                if te.shape != p.shape:
-                    ok = False
-                    break
-                p.data.copy_(te)
+        # Two-pass: validate/convert everything first, then copy — so a mid-list
+        # mismatch can never leave the module half-EMA/half-online.
+        converted, ok = [], True
+        for p, t in zip(trainable, ema_list):
+            try:
+                te = t.detach().to(dtype=p.dtype, device=p.device)
+            except Exception:
+                ok = False
+                break
+            if te.shape != p.shape:
+                ok = False
+                break
+            converted.append(te)
         if ok:
+            with torch.no_grad():
+                for p, te in zip(trainable, converted):
+                    p.data.copy_(te)
             return "ema"
 
     if ema_list is not None:

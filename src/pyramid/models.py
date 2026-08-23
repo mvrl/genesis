@@ -130,23 +130,22 @@ class ModelBundle:
         if self._sr is None:
             ckpt = _resolve_ckpt(_SR_REL[self.arch], self.arch, "SR")
             dino = gc.resolved_dino_weights_path() if self.use_dino_sr else ""
-            gc.build_sr_args(self.arch, dino_weights=dino, steps=self.steps, cfg=self.cfg,
-                             bicubic_init=self.bicubic_init,
-                             bicubic_init_t_start=self.bicubic_init_t_start)
             self._sr, _ = gc.load_sr_denoiser(ckpt, self.arch, dino_weights=dino, device=self.sr_device)
-            self._sr.args.num_sampling_steps = self.steps
-            self._sr.args.cfg = self.cfg
-            self._sr.args.bicubic_init = self.bicubic_init
-            self._sr.args.bicubic_init_t_start = self.bicubic_init_t_start
+            # steps/cfg/warm-start reach the SR trajectory through the pyramid
+            # samplers (unified_sr / multidiffusion take them as call arguments),
+            # NOT through this engine object — its own generate() stays at the
+            # load-time defaults (steps=50, cfg=1.0).
+            self._sr.args.bicubic_init = self.bicubic_init                    # read live
+            self._sr.args.bicubic_init_t_start = self.bicubic_init_t_start   # read live
         return self._sr
 
     def _ensure_op(self):
         if self._op is None:
             ckpt = _resolve_ckpt(_OP_REL[self.arch], self.arch, "OP")
-            # OP main config is locked no-DINO.
+            # OP main config is locked no-DINO. The OP engine intentionally keeps
+            # its load-time sampler defaults (steps=50, cfg=1.0) — the
+            # configuration the paper's dense500 results ran with.
             self._op, _ = gc.load_op_denoiser(ckpt, self.arch, dino_weights="", device=self.op_device)
-            self._op.args.num_sampling_steps = self.steps
-            self._op.args.cfg = self.cfg
         return self._op
 
     # ── primitives ────────────────────────────────────────────────────────────

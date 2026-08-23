@@ -264,12 +264,17 @@ def _load_with_ema(module: torch.nn.Module, ck: dict, label: str) -> str:
         print(f"[eval] {label}: EMA length mismatch ({len(ema)} ema vs {len(trainable)} "
               f"trainable params) — using online weights.", flush=True)
         return "online"
+    # Two-pass: validate/convert everything first, then copy — so a mid-list
+    # mismatch can never leave the module half-EMA/half-online.
+    converted = []
+    for p, t in zip(trainable, ema):
+        te = t.detach().to(dtype=p.dtype, device=p.device)
+        if te.shape != p.shape:
+            print(f"[eval] {label}: EMA shape mismatch — using online weights.", flush=True)
+            return "online"
+        converted.append(te)
     with torch.no_grad():
-        for p, t in zip(trainable, ema):
-            te = t.detach().to(dtype=p.dtype, device=p.device)
-            if te.shape != p.shape:
-                print(f"[eval] {label}: EMA shape mismatch — using online weights.", flush=True)
-                return "online"
+        for p, te in zip(trainable, converted):
             p.data.copy_(te)
     return "ema"
 

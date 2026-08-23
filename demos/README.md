@@ -18,6 +18,9 @@ the **full-pyramid builder**, and **no-model interpolation baselines**.
 | `app_pyramid_unified_large.py` | Pyramid | Same `unified` strategy, **deep 6-level** quadtree (1365 tiles, leaf 32×32; default z13→z18). Cells render tiny by design; the download is stitched **vertically** (apex→base) for a deep-zoom figure. Much heavier/slower — large-memory GPU. | 7868 |
 | `app_downsample_eval.py` / `app_upsample_eval.py` | Baseline | Pure interpolation baselines (no model) for down-/up-sampling. | 7863 / 7864 |
 
+For a non-interactive quick start (one SR pass + one outpainting pass on a live Esri tile,
+inputs/outputs saved to `logs/example_sr_op/`), run `python demos/example_sr_op.py`.
+
 SR is strictly ×2 (ZL → ZL+1) per call. For iterative ×4 / ×8 / ×16 see the
 `--scale` flag documented in [`src/eval/README.md`](../src/eval/README.md).
 
@@ -57,9 +60,7 @@ bash demos/sync_ckpts.sh           # main ckpts + DINOv3 weights → $GENESIS_CK
 ```
 
 Full Hugging Face layout in the root [`README.md`](../README.md) (see *Data & weights*).
-For a standalone one-file inference example (no repo checkout), see
-[`example_sr_op.py`](https://huggingface.co/MVRL/genesis/blob/main/example_sr_op.py) on
-the model card.
+For a one-file inference example, see [`example_sr_op.py`](example_sr_op.py) in this folder.
 
 ---
 

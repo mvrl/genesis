@@ -300,6 +300,12 @@ def main():
     if args.start_sample < 0 or args.sample_count < 0:
         raise ValueError("--start_sample and --sample_count must be non-negative.")
 
+    # The main OP checkpoints are trained no-DINO; attaching DINO would route
+    # features through an untrained projection. Force the paper configuration.
+    if (args.exp or "").startswith("main_") and not args.no_dino:
+        print("[eval-op] main OP checkpoints are no-DINO — forcing --no_dino.", flush=True)
+        args.no_dino = True
+
     ckpt_path = resolve_ckpt("op", args.ckpt, args.exp, args.stage)
     dino      = "" if args.no_dino else resolve_dino_weights(args.dino_weights)
 
