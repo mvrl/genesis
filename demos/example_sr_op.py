@@ -69,7 +69,7 @@ from utils.genesis_common import (  # demos/utils/genesis_common.py
 HF_REPO = "MVRL/genesis"
 ARCH = "JiT-H/16"  # main H/16 checkpoints (~49 GB download; set "JiT-B/16" for the 7 GB variant)
 
-# A Bavarian village amid fields and forest — rural content the models were trained on.
+# A Bavarian village amid fields and forest.
 LAT, LON, ZOOM = 48.6529, 12.9062, 16  # training zoom levels are 10..19
 
 
