@@ -97,8 +97,8 @@ $$
 \mathrm{PSNR}\big(\hat{p},\; \downarrow_2 M(\hat{q})\big)
 $$
 
-Reported with **box** downsampling (area-average, the physically-correct quadtree operator;
-the paper also brackets the result with antialiased bicubic). ≳45 dB indicates a faithful
+Reported with **box** downsampling (area-average, the physically-correct quadtree
+operator). ≳45 dB indicates a faithful
 low-resolution match; low LR-PSNR means a parent and its children disagree — a seam or
 content drift between zoom levels.
 

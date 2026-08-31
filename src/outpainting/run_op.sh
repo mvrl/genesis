@@ -66,7 +66,11 @@ ARGS=(
 [[ -n "$HF_CACHE" ]]  && ARGS+=(--hf_data_cache "$HF_CACHE")
 [[ -n "$WANDB_RUN_NAME" ]] && ARGS+=(--wandb_run_name "$WANDB_RUN_NAME")
 [[ -n "$RESUME_CKPT" ]] && ARGS+=(--resume_ckpt "$RESUME_CKPT")
-[[ "$NO_TIME_WEIGHT" == "1" ]] && ARGS+=(--no-enable_time_weight)
+if [[ "$NO_TIME_WEIGHT" == "1" ]]; then
+    ARGS+=(--no-enable_time_weight)
+else
+    ARGS+=(--enable_time_weight)
+fi
 if [[ "$NO_DINO" == "1" ]]; then
     ARGS+=(--dino_weights "")
 elif [[ -f "$DINO_WEIGHTS" ]]; then

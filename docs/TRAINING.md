@@ -21,12 +21,13 @@ same way.
 cd src/superresolution
 chmod +x run_sr.sh
 # Defaults = paper main: DINO + LPIPS 0.5, 800k steps, JiT-B/16.
-# MODEL_SIZE=H16 for the H/16 run; DEVICES=1 for a single GPU (default 2).
-MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh
+# MODEL_SIZE=H16 for the H/16 run; DEVICES=1 for a single GPU (default 2 — on one
+# GPU add --accumulate_grad_batches 8 to keep the paper's effective batch of 256).
+MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh --accumulate_grad_batches 8
 
 # Resume from a Lightning checkpoint:
 RESUME_CKPT=./runs/main_h16/last.ckpt \
-  MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh
+  MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_sr.sh --accumulate_grad_batches 8
 ```
 
 | Var | Default | Purpose |
@@ -46,7 +47,7 @@ Full ablation matrix, architecture, and CLI flags → [`../src/superresolution/R
 cd src/outpainting
 chmod +x run_op.sh
 # Defaults = paper main: no-DINO + no-time-weight, quadrant curriculum, 800k steps, JiT-B/16.
-MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_op.sh
+MODEL_SIZE=H16 DEVICES=1 OUTPUT_DIR=./runs/main_h16 WANDB_MODE=online ./run_op.sh --accumulate_grad_batches 8
 ```
 
 | Var | Default | Purpose |

@@ -2,8 +2,9 @@
 # =============================================================================
 # run_eval_sr.sh — Super-resolution eval for the Genesis MAIN models (paper Table 2).
 #
-# Defaults reproduce a Table-2 cell: main_b16, random_test, ×2, cfg 1.0, 50 steps,
-# DINO on, NO bicubic-init, full split. Override via env vars or extra `--…` flags.
+# Defaults reproduce the Table-2 configuration: main_b16, random_test, ×2, cfg 1.0,
+# 50 steps, DINO on, NO bicubic-init, full split. Add `--child_zl_group z12-15|z16-17|z18`
+# for one Table-2 cell. Override via env vars or extra `--…` flags.
 # For the SR ablation (paper Table 5) use run_eval_sr_ablation.sh instead.
 #
 # Usage:

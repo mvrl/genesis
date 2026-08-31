@@ -20,11 +20,11 @@ Sites are loaded via the `GlobalDense` class in `src/pyramid/dataset.py`; subtre
 
 | Window | l  | h = l+3 | Root tile covers | Sites |
 |--------|----|---------|-----------------|-------|
-| W1     | 11 | 14      | ~78 km across   | 100    |
-| W2     | 12 | 15      | ~39 km across   | 100    |
-| W3     | 13 | 16      | ~20 km across   | 100    |
-| W4     | 14 | 17      | ~10 km across   | 100    |
-| W5     | 15 | 18      | ~5 km across    | 100    |
+| W1     | 11 | 14      | ~18 km across   | 100    |
+| W2     | 12 | 15      | ~9 km across   | 100    |
+| W3     | 13 | 16      | ~4 km across   | 100    |
+| W4     | 14 | 17      | ~2 km across   | 100    |
+| W5     | 15 | 18      | ~1 km across    | 100    |
 |        |    |         | **Total**       | **500** |
 
 ### Pyramid structure (per sample)
@@ -43,7 +43,7 @@ Depth  Zoom   Grid     Tile count
 
 ## 2. Seed Protocols
 
-Two protocols are evaluated on every subtree. Seeds are always drawn from the ground-truth imagery of that subtree (i.e., the model never sees the GT tiles it must generate).
+Three protocols are evaluated on every subtree. Seeds are always drawn from the ground-truth imagery of that subtree (i.e., the model never sees the GT tiles it must generate).
 
 ### Protocol A — Single seed, level sampled by ratio
 
@@ -55,7 +55,7 @@ One seed tile is placed per subtree. The **zoom level** of the seed is sampled s
 | D-1   | z=l+2 | 4×4 = 16 tiles  | 4      | 4/13 ≈ 30.8 % | Penultimate anchor; seed lands directly on the quadrant grid |
 | D     | z=h   | 8×8 = 64 tiles  | 8      | 8/13 ≈ 61.5 % | Leaf anchor; most realistic single-seed scenario |
 
-The weights are proportional to the relative tile count at each level, so the evaluation distribution reflects how users are likely to place seeds in practice.
+The level weights are fixed at 1:4:8, favoring finer levels (roughly tracking tile count), so the evaluation distribution reflects how users are likely to place seeds in practice.
 
 Once a level is chosen, one tile is selected **uniformly at random** from the `n×n` grid at that level.
 

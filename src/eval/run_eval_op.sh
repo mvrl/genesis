@@ -8,7 +8,7 @@
 #   quad2_adj / quad2_diag (2 known, 50% hole), quad3 (3 known, 25% hole).
 #
 # Usage:
-#   ./run_eval_op.sh                                  # defaults: stage 3, regime=quad1, val_random
+#   ./run_eval_op.sh                                  # defaults: stage 3, regime=quad1, random_test
 #   REGIME=quad3 ./run_eval_op.sh                     # 25%-hole eval
 #   EXP=main_h16 ./run_eval_op.sh                     # H16 main run
 #   SPLIT=val_spatial ./run_eval_op.sh                # spatial val split
@@ -28,7 +28,7 @@ STAGE="${STAGE:-3}"
 MODEL="${MODEL:-JiT-B/16}"
 CKPT="${CKPT:-}"
 
-SPLIT="${SPLIT:-val_random}"
+SPLIT="${SPLIT:-random_test}"
 REGIME="${REGIME:-quad1}"         # quad1 / quad2_adj / quad2_diag / quad3
 
 CFG="${CFG:-1.0}"

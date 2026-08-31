@@ -193,7 +193,7 @@ trained to **500k** (not 800k). **Source:** paper (SR ablation).
 
 ## 8. dense500 multi-scale pyramid completion
 
-Benchmark **dense500**: 500 sites, depth-4 quadtree (z11→z14), 85 tiles/site (🤗 `dcher95/dense500`).
+Benchmark **dense500**: 500 sites, depth-4 quadtrees across five zoom windows (roots z11–z15 → leaves z14–z18), 85 tiles/site (🤗 `dcher95/dense500`).
 **Run:** `python -m pyramid.run_pyramid_eval` (generate) → `eval_pyramid.py` / `eval_ext.py` /
 `caption_agree.py` (score); full loop in [`EVALUATION.md`](EVALUATION.md).
 
@@ -213,7 +213,7 @@ These are the paper's dense500 generation settings; in this repo they are the de
 |---|---|---|
 | Checkpoints | SR + OP main, 800k | `--arch JiT-{B,H}/16` |
 | Sampling steps | **50** | `--steps 50` |
-| CFG | 2.5 | `--cfg 2.5` |
+| CFG | 2.5 (SR pass; engine OP calls are fixed at 1.0) | `--cfg 2.5` |
 | Unified SR overlap | 32 px | `--uni_overlap 32` |
 | Unified SR warm-start τ | 0.40 | `--uni_t 0.40` |
 | Coverage | 100 sites × 5 windows × 3 protocols = **1500 / arch** | `--sites 0:100 --window 1..5 --protocol A/B/C` |

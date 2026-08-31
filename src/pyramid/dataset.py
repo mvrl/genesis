@@ -357,7 +357,8 @@ def proto_A_single_ratio(sub: Subtree, rng: random.Random) -> List[Tile]:
     """Protocol A — one seed, level sampled by tile-count ratio 1:4:8.
 
     Pick a level among {D-2, D-1, D} = {root+1, root+2, root+3} with weights
-    1:4:8 (P = 1/13, 4/13, 8/13 — proportional to tile count), then one tile
+    1:4:8 (P = 1/13, 4/13, 8/13 — fixed weights favoring finer levels; tile
+    counts are 4/16/64), then one tile
     uniformly at that level. The realistic single-seed scenario.
     """
     rz = sub.root[0]

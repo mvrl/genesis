@@ -257,8 +257,9 @@ Inputs stay in `[0, 1]` (DISTS convention).
 
 ### Math
 
-Let `mb` be the boolean hole mask and `base` be the model's input
-(known region + zeros in the hole). Erode the hole inward by 4 pixels
+Let `mb` be the boolean hole mask and `base` be the ground-truth tile;
+the metric compares the model's fill against the real pixels along the
+hole boundary. Erode the hole inward by 4 pixels
 and keep the **ring** that the erosion just removed — a 4-pixel-wide
 annulus *inside* the hole, hugging the known/hole boundary:
 

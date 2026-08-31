@@ -51,12 +51,13 @@ def get_args_parser():
                         help="Clip gradient norm to avoid NaNs")
     parser.add_argument('--precision', default='bf16-mixed', type=str,
                         help="Trainer precision: '32', '16-mixed', 'bf16-mixed'")
-    parser.add_argument('--dino_weights',
-                        default=os.environ.get("GENESIS_DINO_WEIGHTS", ""),
-                        type=str, help="Path to DINOv3 weights (empty string to disable)")
-    parser.add_argument('--enable_time_weight', default=True,
+    parser.add_argument('--dino_weights', default='',
+                        type=str, help="Path to DINOv3 weights (empty = no DINO, "
+                                       "the paper's main OP configuration)")
+    parser.add_argument('--enable_time_weight', default=False,
                         action=argparse.BooleanOptionalAction,
-                        help="Apply time weighting w=1/(1-t); disable for uniform loss")
+                        help="Apply time weighting w=1/(1-t) to the loss; off by default "
+                             "(the paper's models train with the uniform loss)")
     parser.add_argument('--accumulate_grad_batches', default=4, type=int,
                         help="Accumulate gradients over k batches before stepping")
     return parser
