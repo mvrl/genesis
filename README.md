@@ -128,13 +128,19 @@ src/
 
 ```bibtex
 @inproceedings{khanal2026genesis,
-  title     = {{Genesis}: A Generative Engine for Hierarchical Satellite Image Synthesis},
-  author    = {Khanal, Subash and Cui, Yangzhi and Cher, Daniel and Xing, Eric and
-               Wei, Brian and Sastry, Srikumar and Jacobs, Nathan},
-  booktitle = {ACM SIGSPATIAL International Conference on Advances in
-               Geographic Information Systems (SIGSPATIAL)},
-  year      = {2026},
-  url       = {https://arxiv.org/abs/2609.02683},
+  author = {Khanal, Subash and Cui, Yangzhi and Cher, Daniel and Xing, Eric and Wei, Brian and Sastry, Srikumar and Jacobs, Nathan},
+  booktitle = {ACM SIGSPATIAL International Conference on Advances in Geographic Information Systems (ACM SIGSPATIAL)},
+  title = {Genesis: A Generative Engine for Hierarchical Satellite Image Synthesis},
+  doi = {10.1145/3841645.3843313},
+  month = nov,
+  year = {2026},
+  pdf = {https://arxiv.org/pdf/2609.02683},
+  archiveprefix = {arXiv},
+  primaryclass = {cs.CV},
+  eprint = {2609.02683},
+  code = {https://github.com/mvrl/genesis},
+  project = {https://subash-khanal.github.io/genesis/},
+  huggingface = {https://huggingface.co/MVRL/genesis}
 }
 ```
 
