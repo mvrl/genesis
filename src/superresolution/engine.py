@@ -5,19 +5,51 @@ import pytorch_lightning as pl
 from torchvision.utils import make_grid
 from pytorch_lightning.loggers import WandbLogger
 from contextlib import contextmanager
-import wandb
 from model_sr import JiT_models, get_dino_embeddings
 import copy
 
+# `wandb` is only needed when the Lightning trainer is actually logging images
+# (``--wandb_mode`` != disabled).  Importing it lazily keeps the DenoiserSR /
+# side-channel API usable in environments that do not have wandb installed.
+
 
 class DenoiserSR(nn.Module):
+    """Flow-matching denoiser wrapping a :class:`SR_JiT` backbone.
+
+    Two batch protocols are supported:
+
+    **Quad protocol** (original Genesis RGB pyramid SR) — batch carries
+    ``children_rgb`` / ``children_valid`` / ``parent_rgb``; the four child tiles are
+    stitched into the 512×512 target and the loss is masked by child validity.
+
+    **Generic protocol** (auxiliary-channel SR, see ``side_channel.py``) — batch carries
+    ``target`` (B, C, H, W) directly, plus ``parent`` (B, Cp, Hp, Wp) and, optionally,
+    ``side`` (B, Cs, Hs, Ws) for the co-registered auxiliary raster.  ``target_valid``
+    (B, 1, H, W) optionally masks the loss.  Selected automatically when ``"target"``
+    is present in the batch.
+    """
+
     def __init__(self, args):
         super().__init__()
         self.args = args
-        self.net = JiT_models[args.model](
+        model_kwargs = dict(
             output_size=getattr(args, "output_size", 512),
             use_dino=getattr(args, "use_dino", True),
         )
+        # Geometry / side-channel knobs — all optional, defaults reproduce the
+        # original RGB-only Genesis SR operator exactly.
+        keys = ["in_channels", "parent_channels", "parent_size",
+                "side_channels", "side_size", "side_fusion", "side_late_frac",
+                "cond_drop_prob"]
+        if args.model == "JiT-custom":
+            # Only the free-form factory accepts explicit width/depth; the named
+            # presets hard-code them and would raise on a duplicate keyword.
+            keys += ["depth", "hidden_size", "num_heads", "bottleneck_dim"]
+        for key in keys:
+            val = getattr(args, key, None)
+            if val is not None:
+                model_kwargs[key] = val
+        self.net = JiT_models[args.model](**model_kwargs)
         self.P_mean, self.P_std = args.P_mean, args.P_std
         self.t_eps, self.noise_scale = args.t_eps, args.noise_scale
         self.ema_decay1, self.ema_decay2 = args.ema_decay1, args.ema_decay2
@@ -39,10 +71,192 @@ class DenoiserSR(nn.Module):
         else:
             self.lpips_fn = None
 
+        # Optional Sobel-gradient edge loss (disabled when grad_loss_weight=0).
+        # Dependency-free substitute for LPIPS on single-channel physical rasters
+        # (e.g. DSM height): AlexNet-based LPIPS is normalised for 8-bit natural
+        # RGB photos and requires a network fetch of its pretrained weights, which
+        # SLURM job code may not do (see docs/code_guide.md). A Sobel gradient-
+        # magnitude L1 term plays the analogous role (penalising blurred edges
+        # beyond what the flow-matching MSE alone penalises) without either
+        # requirement, and is the loss-term ablation exercised by the
+        # `no_lpips_loss` variant for the auxiliary-channel DSM SR task.
+        self.grad_loss_weight = getattr(args, "grad_loss_weight", 0.0)
+        if self.grad_loss_weight > 0:
+            sobel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
+            sobel_y = sobel_x.t()
+            self.register_buffer("_sobel_x", sobel_x.view(1, 1, 3, 3))
+            self.register_buffer("_sobel_y", sobel_y.view(1, 1, 3, 3))
+
     def sample_t(self, n: int, device=None):
         return torch.sigmoid(torch.randn(n, device=device) * self.P_std + self.P_mean)
 
+    # ------------------------------------------------------------------
+    # Generic (auxiliary-channel) protocol
+    # ------------------------------------------------------------------
+
+    def build_conditions(self, batch):
+        """Assemble the conditioning dict shared by the generic train/sample paths."""
+        parent = batch.get("parent")
+        conditions = {"parent_img": parent}
+        if self.net.use_dino and parent is not None and parent.shape[1] == 3:
+            with torch.no_grad():
+                conditions["dino_feats"] = get_dino_embeddings(
+                    parent, weights_path=self.args.dino_weights
+                )
+        if self.net.side_channels > 0 and batch.get("side") is not None:
+            conditions["side"] = batch["side"]
+        if "zoom_level" in batch:
+            ref = parent if parent is not None else batch["target"]
+            conditions["zoom_level"] = batch["zoom_level"].float().to(ref.device)
+        return conditions
+
+    def _lpips_term(self, x_pred, x1, t, mask):
+        """t-weighted LPIPS between prediction and target.
+
+        Single-channel rasters (e.g. DSM) are replicated to 3 channels so the
+        AlexNet backbone can consume them; that is the standard trick and keeps the
+        `no_lpips_loss` ablation a like-for-like comparison.
+        """
+        def to3(a):
+            return a.expand(-1, 3, -1, -1) if a.shape[1] == 1 else a
+        vals = self.lpips_fn(to3(x_pred).clamp(-1, 1), to3(x1).clamp(-1, 1)).flatten()
+        w = t.flatten()
+        if mask is not None:
+            w = w * (mask.flatten(1).mean(dim=1) > 0).float()
+        return (w * vals).sum() / w.sum().clamp_min(1e-6)
+
+    def _grad_loss_term(self, x_pred, x1, t, mask):
+        """t-weighted Sobel-gradient L1 loss — see `grad_loss_weight` in __init__.
+
+        Applied per-channel (groups=C) so it works for any `in_channels`
+        (1 for DSM, 3 for an RGB target) without reshaping.
+        """
+        C = x_pred.shape[1]
+        kx = self._sobel_x.expand(C, 1, 3, 3).to(x_pred.dtype)
+        ky = self._sobel_y.expand(C, 1, 3, 3).to(x_pred.dtype)
+
+        def grad_mag(a):
+            gx = F.conv2d(a, kx, padding=1, groups=C)
+            gy = F.conv2d(a, ky, padding=1, groups=C)
+            return torch.sqrt(gx ** 2 + gy ** 2 + 1e-8)
+
+        diff = (grad_mag(x_pred) - grad_mag(x1)).abs().mean(dim=1, keepdim=True)  # (B,1,H,W)
+        w = t.view(-1, 1, 1, 1)
+        if mask is not None:
+            diff = diff * mask
+            denom = (w * mask).sum().clamp_min(1.0)
+        else:
+            denom = (w * torch.ones_like(diff)).sum().clamp_min(1.0)
+        return (w * diff).sum() / denom
+
+    def forward_generic(self, batch):
+        """Flow-matching loss on a directly-supplied ``target`` raster.
+
+        batch keys: ``target`` (B,C,H,W), ``parent`` (B,Cp,Hp,Wp),
+        optional ``side`` (B,Cs,Hs,Ws), optional ``target_valid`` (B,1,H,W).
+        """
+        x1 = batch["target"]
+        B = x1.shape[0]
+        device = x1.device
+
+        t = self.sample_t(B, device=device).view(-1, 1, 1, 1)
+        x0 = torch.randn_like(x1) * self.noise_scale
+        zt = t * x1 + (1 - t) * x0
+
+        conditions = self.build_conditions(batch)
+        x_pred = self.net(zt, t.flatten(), conditions=conditions)
+
+        mask = batch.get("target_valid")
+        denom = (1.0 - t).clamp_min(self.t_eps)
+        sq = ((x_pred - zt) / denom - (x1 - zt) / denom) ** 2
+        if mask is None:
+            main_loss = sq.mean()
+        else:
+            main_loss = (sq * mask).sum() / (mask.expand_as(sq).sum()).clamp_min(1.0)
+
+        total_loss = main_loss
+        aux = {"main_loss": main_loss.detach()}
+
+        if self.lpips_fn is not None:
+            lpips_loss = self._lpips_term(x_pred, x1, t, mask)
+            total_loss = total_loss + self.lpips_weight * lpips_loss
+            aux["lpips_loss"] = lpips_loss.detach()
+
+        if self.grad_loss_weight > 0:
+            grad_loss = self._grad_loss_term(x_pred, x1, t, mask)
+            total_loss = total_loss + self.grad_loss_weight * grad_loss
+            aux["grad_loss"] = grad_loss.detach()
+
+        if len(aux) == 1:  # only main_loss — preserve the original no-aux-loss contract
+            return main_loss, {}
+        return total_loss, aux
+
+    @torch.no_grad()
+    def conditional_mean(self, batch, generator=None, n_draws=1):
+        """Deterministic MMSE-style readout: E[x1 | conditioning].
+
+        Evaluates the network at t=0, where ``zt`` is pure noise and therefore carries
+        no information about ``x1`` — so the network's x1-prediction is exactly its
+        estimate of the conditional mean given only ``parent``/``side``.  This is the
+        RMSE-optimal point estimate and is far cheaper and lower-variance than full
+        Euler sampling, which makes it the right primary readout when the question is
+        "does the side channel carry exploitable signal?" rather than "how good are the
+        samples?".  Averaging over ``n_draws`` noise seeds removes the residual
+        dependence on the (uninformative) ``z0`` draw.
+        """
+        conditions = self.build_conditions(batch)
+        parent = batch.get("parent")
+        ref = parent if parent is not None else batch["side"]
+        B = ref.shape[0]
+        S = self.net.output_size
+        acc = None
+        for _ in range(n_draws):
+            z0 = self.noise_scale * torch.randn(
+                B, self.net.out_channels, S, S,
+                device=ref.device, dtype=ref.dtype, generator=generator,
+            )
+            t = torch.zeros(B, device=ref.device, dtype=ref.dtype)
+            pred = self.net(z0, t, conditions=conditions)
+            acc = pred if acc is None else acc + pred
+        return acc / n_draws
+
+    @torch.no_grad()
+    def generate_generic(self, batch, generator=None):
+        """Genesis-faithful Euler flow sampling under the generic protocol."""
+        conditions = self.build_conditions(batch)
+        parent = batch.get("parent")
+        ref = parent if parent is not None else batch["side"]
+        B = ref.shape[0]
+        S = self.net.output_size
+        z = self.noise_scale * torch.randn(
+            B, self.net.out_channels, S, S,
+            device=ref.device, dtype=ref.dtype, generator=generator,
+        )
+        timesteps = torch.linspace(0.0, 1.0, self.steps + 1, device=ref.device).view(-1, 1, 1, 1)
+        dt = 1.0 / self.steps
+        for i in range(self.steps):
+            t = timesteps[i].expand(B, -1, -1, -1)
+            x_cond = self.net(z, t.flatten(), conditions=conditions)
+            v_pred = (x_cond - z) / (1.0 - t + 1e-5)
+            if self.cfg_scale > 1.0:
+                uncond = {"dino_feats": None, "parent_img": None,
+                          "zoom_level": None, "side": None}
+                x_uncond = self.net(z, t.flatten(), conditions=uncond)
+                v_uncond = (x_uncond - z) / (1.0 - t + 1e-5)
+                v_pred = v_uncond + self.cfg_scale * (v_pred - v_uncond)
+            z = z + dt * v_pred
+        return z
+
+    # ------------------------------------------------------------------
+    # Quad protocol (original Genesis RGB pyramid SR)
+    # ------------------------------------------------------------------
+
     def forward(self, batch):
+        if "target" in batch:
+            return self.forward_generic(batch)
+        return self.forward_quad(batch)
+
+    def forward_quad(self, batch):
         # children_rgb:   (B, 4, 3, S, S)  — individual child tiles; zeros where absent
         # children_valid: (B, 4)            — bool, True where the child tile is present
         # Quadrant order (QUAD_ORDER): UL(0,0), UR(1,0), LL(0,1), LR(1,1)
@@ -131,6 +345,8 @@ class DenoiserSR(nn.Module):
 
     @torch.no_grad()
     def generate(self, batch):
+        if "target" in batch or "parent_rgb" not in batch:
+            return self.generate_generic(batch)
         parent_img = batch["parent_rgb"]
 
         # Pixel parent is always the base conditioning
@@ -272,21 +488,29 @@ class LitDenoiserSR(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.save_hyperparameters(args)
-        self.model = torch.compile(DenoiserSR(args))
+        # torch.compile costs ~1-2 min of warmup, which is worth it for an 800k-step
+        # paper run but not for short budgeted runs; `--no-compile` opts out.
+        self.model = (torch.compile(DenoiserSR(args))
+                      if getattr(args, "compile", True) else DenoiserSR(args))
 
         # EMA tracks only trainable parameters — excludes frozen LPIPS weights.
-        # Must be assigned to _orig_mod (the inner DenoiserSR) so that
+        # Must be assigned to the inner DenoiserSR (see `self.core`) so that
         # update_ema() can access them via `self.ema_params1/2` on its own instance.
         # Assigning to the compiled wrapper instead would leave the inner module
         # seeing None and crash on the first update_ema() call.
         trainable = [p for p in self.model.parameters() if p.requires_grad]
-        self.model._orig_mod.ema_params1 = copy.deepcopy(trainable)
-        self.model._orig_mod.ema_params2 = copy.deepcopy(trainable)
+        self.core.ema_params1 = copy.deepcopy(trainable)
+        self.core.ema_params2 = copy.deepcopy(trainable)
 
         # Shared stage — updated every step in on_train_batch_start,
         # read by ZLCurriculumSampler at each epoch start
         import torch.multiprocessing as mp
         self.shared_stage = mp.Value('i', 0)
+
+    @property
+    def core(self):
+        """The inner :class:`DenoiserSR`, unwrapping ``torch.compile`` when present."""
+        return getattr(self.model, "_orig_mod", self.model)
 
     def on_train_batch_start(self, batch, batch_idx):
         step = int(self.trainer.global_step)
@@ -301,7 +525,7 @@ class LitDenoiserSR(pl.LightningModule):
 
     def on_fit_start(self):
         device = next(self.model.parameters()).device
-        orig = self.model._orig_mod
+        orig = self.core
         # Move LPIPS to the correct device once at fit start (avoids graph breaks in compiled forward)
         if getattr(orig, 'lpips_fn', None) is not None:
             orig.lpips_fn.to(device)
@@ -322,7 +546,7 @@ class LitDenoiserSR(pl.LightningModule):
              orig.ema_params2 = [p.detach().clone() for p in trainable]
 
     def on_save_checkpoint(self, checkpoint):
-        orig = self.model._orig_mod
+        orig = self.core
         if orig.ema_params1 is not None:
             checkpoint["ema_params1"] = [p.cpu() for p in orig.ema_params1]
         if orig.ema_params2 is not None:
@@ -341,7 +565,7 @@ class LitDenoiserSR(pl.LightningModule):
         ema_idx=1 uses ema_decay1 (slower, more stable); ema_idx=2 uses ema_decay2.
         Falls through as a no-op if EMA params haven't been initialised yet.
         """
-        orig = self.model._orig_mod
+        orig = self.core
         ema_params = orig.ema_params1 if ema_idx == 1 else orig.ema_params2
         if ema_params is None:
             yield
@@ -369,8 +593,9 @@ class LitDenoiserSR(pl.LightningModule):
         if aux:
             self.log("train/main_loss",  aux["main_loss"],  on_step=True, on_epoch=False)
             self.log("train/lpips_loss", aux["lpips_loss"], on_step=True, on_epoch=False)
-        if self.trainer.global_step % getattr(self.model.args, "log_freq", 1000) == 0:
+        if self.trainer.global_step % getattr(self.core.args, "log_freq", 1000) == 0:
             if isinstance(self.logger, WandbLogger):
+                import wandb
                 with torch.no_grad(), self.ema_context(ema_idx=1):
                     gen = self.model.generate(batch)
                 def to01(x): return (x * 0.5 + 0.5).clamp(0, 1)
