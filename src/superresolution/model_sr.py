@@ -143,12 +143,18 @@ class CrossAttention(nn.Module):
         q = self.q_proj(x).reshape(B, N, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
         k = self.k_proj(context).reshape(B, M, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
         v = self.v_proj(context).reshape(B, M, self.num_heads, self.head_dim).permute(0, 2, 1, 3)
-        attn = (q @ k.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        # Fused SDPA instead of an explicit (B, heads, N, M) score matrix: same maths,
+        # but it never materialises the attention weights, which is a large memory-
+        # bandwidth saving at these token counts (every block of every JiT model carries
+        # one of these).  `mask` keeps its original semantics: nonzero = attend.
+        attn_mask = None
         if mask is not None:
-            mask = mask.to(attn.device)
-            attn = attn.masked_fill(mask == 0, float("-inf"))
-        attn = self.attn_drop(attn.softmax(dim=-1))
-        x = (attn @ v).permute(0, 2, 1, 3).reshape(B, N, D)
+            attn_mask = mask.to(device=q.device) != 0
+        x = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=attn_mask,
+            dropout_p=self.attn_drop.p if self.training else 0.0,
+        )
+        x = x.permute(0, 2, 1, 3).reshape(B, N, D)
         return self.proj_drop(self.proj(x))
 
 
