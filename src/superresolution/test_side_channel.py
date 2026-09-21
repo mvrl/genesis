@@ -335,6 +335,35 @@ def test_evaluate_produces_both_readouts():
         assert math.isfinite(res[key]["slope_rmse_deg"]), (key, res)
 
 
+def test_flow_budget_does_not_shrink_the_cond_mean_split():
+    """Regression: capping the expensive flow readout must NOT cap ``cond_mean``.
+
+    Tying the two together silently evaluates the *primary* metric on whatever subset
+    the sampling budget allowed, which makes it incomparable with a baseline measured
+    over the full split -- a comparison bug, not just a precision loss.
+    """
+    cfg = SideSRConfig(side_channels=3, side_size=64, side_fusion="early",
+                       num_sampling_steps=2, residual_scale=0.8, **TINY_CFG)
+    model = build_denoiser(cfg)
+    batches = [_synthetic_batch(cfg, b=2) for _ in range(4)]   # 8 tiles over 4 batches
+    res = evaluate_side_sr(model, batches, cfg, DENORM, device="cpu",
+                           cond_mean_draws=1, run_flow_sampling=True,
+                           flow_max_batches=1)
+    assert res["n_tiles"] == 8, res            # cond_mean saw every tile
+    assert res["n_tiles_flow"] == 2, res       # flow saw only the first batch
+    assert math.isfinite(res["cond_mean"]["rmse_m"])
+    assert math.isfinite(res["flow"]["rmse_m"])
+
+
+def test_max_batches_still_caps_both():
+    cfg = SideSRConfig(num_sampling_steps=2, residual_scale=0.8, **TINY_CFG)
+    model = build_denoiser(cfg)
+    batches = [_synthetic_batch(cfg, b=2) for _ in range(4)]
+    res = evaluate_side_sr(model, batches, cfg, DENORM, device="cpu",
+                           cond_mean_draws=1, run_flow_sampling=True, max_batches=2)
+    assert res["n_tiles"] == 4 and res["n_tiles_flow"] == 4, res
+
+
 def test_residual_false_needs_no_base():
     cfg = SideSRConfig(residual=False, num_sampling_steps=2, **TINY_CFG)
     model = build_denoiser(cfg)

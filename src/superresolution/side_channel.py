@@ -355,6 +355,7 @@ def evaluate_side_sr(
     cond_mean_draws: int = 2,
     run_flow_sampling: bool = True,
     max_batches: Optional[int] = None,
+    flow_max_batches: Optional[int] = None,
     seed: int = 12345,
     amp_dtype: torch.dtype = torch.bfloat16,
 ) -> Dict[str, Any]:
@@ -362,14 +363,21 @@ def evaluate_side_sr(
 
     Produces ``cond_mean`` metrics (deterministic conditional-mean readout; the primary
     accuracy number) and, when ``run_flow_sampling``, ``flow`` metrics (Genesis-faithful
-    Euler sampling).  Each batch's per-tile predictions are accumulated on CPU so the
-    metrics are computed once over the whole split rather than averaged over batches.
+    Euler sampling).  Per-tile predictions are accumulated on CPU so the metrics are
+    computed once over the whole split rather than averaged over batches.
+
+    ``max_batches`` caps the cheap ``cond_mean`` readout; ``flow_max_batches``
+    *separately* caps the ~``num_sampling_steps``x more expensive ``flow`` readout.
+    Keeping these independent matters: tying them together would silently shrink the
+    primary metric's evaluation set to whatever the sampling budget allowed, making it
+    incomparable with a baseline measured over the full split.  The returned
+    ``n_tiles`` / ``n_tiles_flow`` record what each number was actually computed on.
     """
     device = torch.device(device)
     model.to(device).eval()
     use_amp = device.type == "cuda"
 
-    preds_cm, preds_fl, gts = [], [], []
+    preds_cm, preds_fl, gts, gts_fl = [], [], [], []
     for i, batch in enumerate(loader):
         if max_batches is not None and i >= max_batches:
             break
@@ -377,13 +385,16 @@ def evaluate_side_sr(
                  for k, v in batch.items()}
         gen = torch.Generator(device=device).manual_seed(seed + i)
         base = batch.get("base")
+        want_flow = run_flow_sampling and (flow_max_batches is None or i < flow_max_batches)
         with torch.autocast(device_type=device.type, dtype=amp_dtype, enabled=use_amp):
             cm = model.conditional_mean(batch, generator=gen, n_draws=cond_mean_draws)
-            fl = model.generate_generic(batch, generator=gen) if run_flow_sampling else None
+            fl = model.generate_generic(batch, generator=gen) if want_flow else None
+        gt_batch = denorm(batch["target_hr_norm"]).cpu()
         preds_cm.append(decode_prediction(cm.float(), base, cfg, denorm).cpu())
+        gts.append(gt_batch)
         if fl is not None:
             preds_fl.append(decode_prediction(fl.float(), base, cfg, denorm).cpu())
-        gts.append(denorm(batch["target_hr_norm"]).cpu())
+            gts_fl.append(gt_batch)
 
     gt = torch.cat(gts)
     out: Dict[str, Any] = {
@@ -391,7 +402,9 @@ def evaluate_side_sr(
         "cond_mean": raster_metrics(torch.cat(preds_cm), gt, gsd=gsd),
     }
     if preds_fl:
-        out["flow"] = raster_metrics(torch.cat(preds_fl), gt, gsd=gsd)
+        gt_fl = torch.cat(gts_fl)
+        out["n_tiles_flow"] = int(gt_fl.shape[0])
+        out["flow"] = raster_metrics(torch.cat(preds_fl), gt_fl, gsd=gsd)
     model.train()
     return out
 
