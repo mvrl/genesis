@@ -257,7 +257,41 @@ class SR_JiT(nn.Module):
       learn resolution-specific hallucination patterns (e.g. urban detail at ZL 18 vs
       coarse geography at ZL 14). zoom=0 is the "unknown" sentinel — passed through the
       embedder as-is; the model learns to treat it as a null signal via cond_drop_prob.
+
+    Auxiliary side-channel conditioning (``side_channels > 0``, OPTIONAL):
+      A second co-registered raster (e.g. a high-resolution optical image when the SR
+      *target* is a single-channel geophysical raster such as a DSM) can be supplied as
+      ``conditions["side"]`` with shape (B, side_channels, side_size, side_size).  Unlike
+      ``parent_img``, the side raster may live at ANY resolution — in particular it may be
+      at the *output* resolution, which is the regime the mechanism is designed for
+      (high-res optical + low-res DSM → high-res DSM).
+
+      Three mutually exclusive fusion mechanisms, selected by ``side_fusion``:
+        ``"early"``     — channel-concatenate the (resized) side raster with the noisy
+                          target before the patch embedder.  Input-level fusion; the
+                          side slice of ``x_embedder.proj1`` is zero-initialised so the
+                          model starts *bit-identical* to the ``"none"`` model.
+        ``"crossattn"`` — embed the side raster into 16×16 = 256 tokens and append them
+                          to the ``sr_cross_attn`` context alongside the parent tokens.
+                          This mirrors TerraDiT's conditioning pattern (a zero-initialised
+                          cross-attention residual branch).
+        ``"late"``      — embed the side raster into 256 tokens spatially aligned with the
+                          backbone token grid and add them (through a zero-initialised
+                          linear) to the token stream at the start of the trailing
+                          ``side_late_frac`` of blocks.  Tests whether the side signal is
+                          only needed for high-frequency refinement.
+        ``"none"``      — disabled (default; preserves the original Genesis behaviour).
+
+    Decoupled parent geometry (``parent_channels`` / ``parent_size``):
+      The parent conditioning raster no longer has to be 3-channel at ``output_size // 2``.
+      ``parent_size`` sets its spatial size (the parent patch size is auto-chosen as
+      ``parent_size // 16`` so the context is always 256 tokens) and ``parent_channels``
+      its channel count.  This is what allows an N× (rather than strictly 2×) SR factor
+      and a single-channel low-res parent.
     """
+
+    _SIDE_FUSIONS = ("none", "early", "crossattn", "late")
+
     def __init__(
         self,
         output_size=512,
@@ -271,17 +305,43 @@ class SR_JiT(nn.Module):
         bottleneck_dim=128,
         cond_drop_prob=0.1,
         use_dino=True,  # whether to use DINO features on top of pixel conditioning
+        parent_channels=None,   # default: same as in_channels (original behaviour)
+        parent_size=None,       # default: output_size // 2   (original behaviour)
+        side_channels=0,        # 0 disables the auxiliary side-channel path entirely
+        side_size=None,         # default: output_size (side raster at target resolution)
+        side_fusion="none",     # one of _SIDE_FUSIONS
+        side_late_frac=0.25,    # fraction of *trailing* blocks that receive late injection
     ):
         super().__init__()
+
+        if side_fusion not in self._SIDE_FUSIONS:
+            raise ValueError(
+                f"side_fusion must be one of {self._SIDE_FUSIONS}, got {side_fusion!r}"
+            )
+        if side_channels > 0 and side_fusion == "none":
+            raise ValueError(
+                "side_channels > 0 requires side_fusion in "
+                f"{self._SIDE_FUSIONS[1:]} (got 'none')"
+            )
+        if side_channels == 0 and side_fusion != "none":
+            raise ValueError(
+                f"side_fusion={side_fusion!r} requires side_channels > 0"
+            )
 
         self.in_channels = in_channels
         self.out_channels = in_channels
         self.num_heads = num_heads
         self.hidden_size = hidden_size
         self.output_size = output_size      # child/output image size  (512)
-        self.parent_size = output_size // 2 # parent tile size          (256)
+        self.parent_size = output_size // 2 if parent_size is None else parent_size
+        self.parent_channels = in_channels if parent_channels is None else parent_channels
         self.cond_drop_prob = cond_drop_prob
         self.use_dino = use_dino
+
+        self.side_channels = side_channels
+        self.side_fusion = side_fusion
+        self.side_size = output_size if side_size is None else side_size
+        self.side_late_frac = side_late_frac
 
         # Child patch size: ensures 16×16 = 256 tokens regardless of output_size
         child_patch_size = output_size // 16
@@ -294,9 +354,12 @@ class SR_JiT(nn.Module):
         # zoom=0 acts as the "unknown GSD" sentinel — learned during cond_drop_prob training.
         self.zoom_embedder = TimestepEmbedder(hidden_size)
 
-        # Noisy child at output_size × output_size → 256 tokens (16×16 grid)
+        # Noisy child at output_size × output_size → 256 tokens (16×16 grid).
+        # Under "early" fusion the side raster rides along as extra input channels.
+        x_in_chans = in_channels + (side_channels if side_fusion == "early" else 0)
+        self.x_in_chans = x_in_chans
         self.x_embedder = BottleneckPatchEmbed(
-            output_size, child_patch_size, in_channels, bottleneck_dim, hidden_size, bias=True
+            output_size, child_patch_size, x_in_chans, bottleneck_dim, hidden_size, bias=True
         )
 
         num_patches = self.x_embedder.num_patches  # always 256
@@ -324,15 +387,43 @@ class SR_JiT(nn.Module):
         self.decoder = FinalLayer(hidden_size, child_patch_size, self.out_channels)
 
         # Parent conditioning:
-        #   Pixel embedder always present — patch_size=16 on 256×256 parent → 256 tokens
+        #   Pixel embedder always present — patch size chosen so the parent always
+        #   yields a 16×16 = 256-token context, whatever its spatial size.
+        parent_patch = max(1, self.parent_size // 16)
+        self.parent_patch_size = parent_patch
         self.parent_context_embedder = zero_module(
-            nn.Conv2d(in_channels, hidden_size, kernel_size=16, stride=16)
+            nn.Conv2d(self.parent_channels, hidden_size,
+                      kernel_size=parent_patch, stride=parent_patch)
         )
         # DINO projection — only when use_dino=True
         if use_dino:
             self.parent_proj = zero_module(nn.Linear(1024, hidden_size))
         else:
             self.parent_proj = None
+
+        # ---- Auxiliary side-channel conditioning ----
+        self.side_context_embedder = None   # "crossattn"
+        self.side_late_embedder = None      # "late"
+        self.side_late_proj = None          # "late"
+        self.side_late_start = depth        # no-op default
+        if side_fusion == "crossattn":
+            side_patch = max(1, self.side_size // 16)
+            self.side_patch_size = side_patch
+            self.side_context_embedder = zero_module(
+                nn.Conv2d(side_channels, hidden_size,
+                          kernel_size=side_patch, stride=side_patch)
+            )
+        elif side_fusion == "late":
+            side_patch = max(1, self.side_size // 16)
+            self.side_patch_size = side_patch
+            self.side_late_embedder = nn.Conv2d(
+                side_channels, hidden_size, kernel_size=side_patch, stride=side_patch
+            )
+            # Zeroed in initialize_weights() so "late" starts as an exact no-op.
+            self.side_late_proj = nn.Linear(hidden_size, hidden_size)
+            self.side_late_start = max(0, depth - max(1, int(round(depth * side_late_frac))))
+        else:
+            self.side_patch_size = None
 
         self.initialize_weights()
 
@@ -369,16 +460,43 @@ class SR_JiT(nn.Module):
         nn.init.constant_(self.decoder.linear.weight, 0)
         nn.init.constant_(self.decoder.linear.bias, 0)
 
+        # ---- Side-channel paths start as exact no-ops ----
+        # This matters for the fusion-mechanism comparison: every side_fusion mode is
+        # initialised to the *same function* as side_fusion="none", so any measured
+        # difference comes from what the model learns to do with the side raster, not
+        # from a different random initialisation.
+        if self.side_fusion == "early" and self.side_channels > 0:
+            # Zero only the side-channel slice of the first patch-embed conv, leaving the
+            # target-channel slice at its xavier init.
+            self.x_embedder.proj1.weight.data[:, self.in_channels:].zero_()
+        if self.side_fusion == "late":
+            # _basic_init above xavier-initialised this Linear; re-zero it.
+            nn.init.constant_(self.side_late_proj.weight, 0)
+            nn.init.constant_(self.side_late_proj.bias, 0)
+
+    def _resize_side(self, side):
+        """Bring the side raster to ``self.side_size`` if it was supplied at another size."""
+        if side.shape[-1] == self.side_size and side.shape[-2] == self.side_size:
+            return side
+        return F.interpolate(
+            side, size=(self.side_size, self.side_size),
+            mode="bicubic", align_corners=False,
+        )
+
     def forward(self, x, t, conditions=None):
         """
-        x          : (B, 3, output_size, output_size)  noisy child mosaic
+        x          : (B, in_channels, output_size, output_size)  noisy target
         t          : (B,)                               diffusion timestep ∈ [0, 1]
         conditions : dict with:
-                       parent_img  (B, 3, 256, 256)  — always required
+                       parent_img  (B, parent_channels, parent_size, parent_size)
                        dino_feats  (B, 256, 1024)    — optional, only when use_dino=True
                        zoom_level  (B,) float        — **target** tile zoom level (= parent ZL+1);
                                                        0 = unknown
-        Parent context = pixel_tokens always; + dino_tokens appended when use_dino=True.
+                       side        (B, side_channels, side_size, side_size) — optional
+                                                       auxiliary co-registered raster; only
+                                                       used when side_channels > 0
+        Parent context = pixel_tokens always; + dino_tokens appended when use_dino=True;
+        + side tokens appended when side_fusion="crossattn".
         Zoom level is embedded via sinusoidal MLP and added to the AdaLN vector c.
         """
         B = x.shape[0]
@@ -387,6 +505,7 @@ class SR_JiT(nn.Module):
         c = t_emb
 
         parent_tokens = None
+        side = None
 
         if conditions is not None:
             drop_all_conds = (
@@ -410,16 +529,44 @@ class SR_JiT(nn.Module):
                     else:
                         parent_tokens = dino_tokens
 
+                # Auxiliary co-registered side raster
+                if self.side_channels > 0 and conditions.get("side") is not None:
+                    side = self._resize_side(conditions["side"].to(x.dtype))
+
                 # Target-tile zoom-level conditioning — adds to c via sinusoidal embedding
                 if conditions.get("zoom_level") is not None:
                     zl = conditions["zoom_level"].float().to(x.device)  # (B,)
                     c = c + self.zoom_embedder(zl)
 
-        # ViT forward — parent_mask=None: all 256 parent DINO tokens attend equally (no ROI)
-        x = self.x_embedder(x)
-        x += self.pos_embed
+        # Side tokens for the cross-attention context (mechanism: "crossattn")
+        if side is not None and self.side_fusion == "crossattn":
+            side_tokens = self.side_context_embedder(side).flatten(2).transpose(1, 2)
+            parent_tokens = (side_tokens if parent_tokens is None
+                             else torch.cat([parent_tokens, side_tokens], dim=1))
 
-        for block in self.blocks:
+        # Input-level channel concatenation (mechanism: "early")
+        if self.side_fusion == "early":
+            if side is None:
+                side = x.new_zeros(B, self.side_channels, self.output_size, self.output_size)
+            elif side.shape[-1] != self.output_size:
+                side = F.interpolate(side, size=(self.output_size, self.output_size),
+                                     mode="bicubic", align_corners=False)
+            x = torch.cat([x, side], dim=1)
+
+        # Spatially-aligned tokens for late injection (mechanism: "late")
+        side_late_tokens = None
+        if side is not None and self.side_fusion == "late":
+            side_late_tokens = self.side_late_proj(
+                self.side_late_embedder(side).flatten(2).transpose(1, 2)
+            )
+
+        # ViT forward — parent_mask=None: all parent/side context tokens attend equally (no ROI)
+        x = self.x_embedder(x)
+        x = x + self.pos_embed
+
+        for i, block in enumerate(self.blocks):
+            if side_late_tokens is not None and i == self.side_late_start:
+                x = x + side_late_tokens
             x = block(
                 x, c,
                 feat_rope=self.feat_rope,
@@ -427,7 +574,7 @@ class SR_JiT(nn.Module):
                 parent_mask=None,
             )
 
-        # Decoder: (B, 256, D) → (B, 3, output_size, output_size)
+        # Decoder: (B, 256, D) → (B, out_channels, output_size, output_size)
         x = self.decoder(x, c)
         return unpatchify(x, self.child_patch_size, self.out_channels)
 
@@ -454,6 +601,13 @@ def JiT_H_16(**kwargs):
 def JiT_H_32(**kwargs):
     return SR_JiT(depth=32, hidden_size=1280, num_heads=16, bottleneck_dim=256, **kwargs)
 
+def JiT_custom(depth=12, hidden_size=768, num_heads=12, bottleneck_dim=128, **kwargs):
+    """Free-form size, for capacity-matched controls that need a width/depth between
+    the named presets (e.g. a DSM-only baseline parameter-matched to a side-conditioned
+    model).  All geometry kwargs of :class:`SR_JiT` pass straight through."""
+    return SR_JiT(depth=depth, hidden_size=hidden_size, num_heads=num_heads,
+                  bottleneck_dim=bottleneck_dim, **kwargs)
+
 
 JiT_models = {
     'JiT-B/16': JiT_B_16,
@@ -462,6 +616,7 @@ JiT_models = {
     'JiT-L/32': JiT_L_32,
     'JiT-H/16': JiT_H_16,
     'JiT-H/32': JiT_H_32,
+    'JiT-custom': JiT_custom,
 }
 
 
@@ -479,5 +634,18 @@ if __name__ == "__main__":
         out = m(x, t, conditions=cond)
         assert out.shape == (B, 3, 512, 512)
         print(f"[{label:15s}] {x.shape} → {out.shape} | "
+              f"{sum(p.numel() for p in m.parameters())/1e6:.1f}M params")
+
+    # ---- Auxiliary side-channel SR (1-ch DSM target, 3-ch high-res optical side) ----
+    xd     = torch.randn(B, 1, 512, 512, device=device)
+    parent = torch.randn(B, 1, 128, 128, device=device)   # 4× low-res DSM parent
+    side   = torch.randn(B, 3, 512, 512, device=device)   # high-res optical
+    for fusion in ("early", "crossattn", "late"):
+        m = JiT_B_16(output_size=512, use_dino=False, in_channels=1,
+                     parent_channels=1, parent_size=128,
+                     side_channels=3, side_size=512, side_fusion=fusion).to(device)
+        out = m(xd, t, conditions={"parent_img": parent, "side": side})
+        assert out.shape == (B, 1, 512, 512), out.shape
+        print(f"[side={fusion:9s}] {xd.shape} → {out.shape} | "
               f"{sum(p.numel() for p in m.parameters())/1e6:.1f}M params")
     print("✓ passed")

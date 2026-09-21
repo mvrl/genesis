@@ -64,3 +64,12 @@ Curriculum stage map, architecture, and CLI flags → [`../src/outpainting/READM
 The released main checkpoints are 800k steps (SR ablations 500k). Curriculum boundaries fall at
 20/40/60 % of `MAX_STEPS`. See [`HYPERPARAMETERS.md`](HYPERPARAMETERS.md) for the exact per-operator
 settings and [`EVALUATION.md`](EVALUATION.md) to evaluate a trained checkpoint against the paper.
+
+## Auxiliary side-channel SR (non-RGB targets)
+
+The SR operator can also super-resolve a **non-RGB raster** (e.g. a DSM) while conditioning on
+a **co-registered auxiliary raster** at a different resolution (e.g. high-resolution optical).
+This is off by default and does not change any behaviour above. See
+[`SIDE_CHANNEL.md`](SIDE_CHANNEL.md) for the three fusion mechanisms (`early` / `crossattn` /
+`late`), the generic `target`/`parent`/`side` batch protocol, the wall-clock-budgeted training
+loop, and the terrain-aware metrics.
