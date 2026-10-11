@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://subash-khanal.github.io/genesis"><img src="https://img.shields.io/badge/Project-Page-2ea44f" alt="Project Page"></a>
-  <a href="https://arxiv.org/abs/2609.02683"><img src="https://img.shields.io/badge/arXiv-2609.02683-b31b1b" alt="arXiv"></a>
+  <a href="https://arxiv.org/abs/2609.02683"><img src="https://img.shields.io/badge/arXiv-Paper-b31b1b?logo=arxiv&logoColor=white" alt="arXiv"></a>
   <a href="https://huggingface.co/MVRL/genesis"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Models-yellow" alt="Hugging Face Models"></a>
 </p>
 
